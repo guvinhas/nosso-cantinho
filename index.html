@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="6">
+<meta name="app-version" content="7">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -80,8 +80,11 @@ nav button.on .i{filter:none;opacity:1}
 .fab{position:fixed;right:calc(var(--sr) + 18px);bottom:calc(var(--sb) + 82px);width:56px;height:56px;border-radius:50%;background:var(--accent);color:#170d08;font-size:30px;box-shadow:0 10px 24px rgba(0,0,0,.4);z-index:11;display:flex;align-items:center;justify-content:center}
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:none;align-items:flex-end;justify-content:center}
 .sheet-bg.show{display:flex}
-.sheet{background:var(--bg2);width:100%;max-width:720px;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:22px 22px 0 0;padding:10px calc(var(--sr) + 18px) calc(var(--sb) + 22px) calc(var(--sl) + 18px);animation:up .22s ease-out}
+.sheet{background:var(--bg2);width:100%;max-width:720px;max-height:calc(100vh - var(--st) - 24px);max-height:calc(100dvh - var(--st) - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:22px 22px 0 0;padding:10px calc(var(--sr) + 18px) calc(var(--sb) + 22px) calc(var(--sl) + 18px);animation:up .22s ease-out}
 @keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.sheet-x{position:sticky;top:0;float:right;margin:0 -6px -38px 0;z-index:6;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15)}
+.sheet{overscroll-behavior:contain}
+.sheet-bg.show{padding-top:calc(var(--st) + 10px)}
 .grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 12px}
 .sheet h2{font-family:Fraunces,serif;font-size:22px;margin:0 0 14px}
 .field{margin-bottom:14px}
@@ -562,7 +565,25 @@ function viewUsAll(){
 }
 
 // =============== sheets ===============
-function openSheet(html, onMount){ $("#sheet").innerHTML = `<div class="grab"></div>` + html; $("#sheetBg").classList.add("show"); $("#sheet").scrollTop=0; onMount && onMount($("#sheet")); }
+function openSheet(html, onMount){
+  const sh = $("#sheet");
+  sh.innerHTML = (S.mustName ? "" : `<button class="sheet-x" aria-label="Fechar">✕</button>`) + `<div class="grab"></div>` + html;
+  sh.style.transform = ""; $("#sheetBg").classList.add("show"); sh.scrollTop=0;
+  const x = sh.querySelector(".sheet-x"); x && (x.onclick = closeSheet);
+  onMount && onMount(sh);
+}
+// arrastar pra baixo pra fechar (quando a janela está no topo)
+function swipeToClose(sh, close){
+  let y0=null, dy=0, active=false;
+  sh.addEventListener("touchstart", e=>{ if (sh.scrollTop>0 || S.mustName) { y0=null; return; } y0=e.touches[0].clientY; dy=0; active=false; }, { passive:true });
+  sh.addEventListener("touchmove", e=>{ if (y0==null) return; dy = e.touches[0].clientY - y0;
+    if (dy>8 && sh.scrollTop<=0){ active=true; sh.style.transition="none"; sh.style.transform=`translateY(${dy}px)`; } }, { passive:true });
+  sh.addEventListener("touchend", ()=>{ if (!active){ y0=null; return; } sh.style.transition="transform .2s"; 
+    if (dy>110){ sh.style.transform="translateY(100%)"; setTimeout(()=>{ sh.style.transition=""; sh.style.transform=""; close(); }, 180); }
+    else sh.style.transform=""; y0=null; active=false; });
+}
+swipeToClose($("#sheet"), ()=>closeSheet());
+document.addEventListener("keydown", e=>{ if (e.key==="Escape"){ const ov=[...document.querySelectorAll(".sheet-bg.show")].pop(); if (ov && ov.id!=="sheetBg") ov.remove(); else if (!S.mustName) closeSheet(); } });
 function closeSheet(){ $("#sheetBg").classList.remove("show"); }
 $("#sheetBg").addEventListener("click", e=>{ if(e.target.id==="sheetBg" && !S.mustName) closeSheet(); });
 
@@ -762,11 +783,11 @@ function matchPlatform(name){
 function openPosterPicker(st, done){
   const ov = document.createElement("div");
   ov.className = "sheet-bg show"; ov.style.zIndex = 30;
-  ov.innerHTML = `<div class="sheet"><div class="grab"></div><h2>Escolha a capa</h2><div class="pgrid" id="pg"><div class="small">Carregando capas…</div></div>
+  ov.innerHTML = `<div class="sheet"><button class="sheet-x" aria-label="Fechar">✕</button><div class="grab"></div><h2>Escolha a capa</h2><div class="pgrid" id="pg"><div class="small">Carregando capas…</div></div>
     <div class="btns"><button class="btn g" id="pgClose">Fechar</button></div></div>`;
   document.body.appendChild(ov);
   const close = ()=>ov.remove();
-  ov.querySelector("#pgClose").onclick = close;
+  ov.querySelector("#pgClose").onclick = close; ov.querySelector(".sheet-x").onclick = close; swipeToClose(ov.querySelector(".sheet"), close);
   ov.addEventListener("click", e=>{ if(e.target===ov) close(); });
   TMDB.details(st.tmdb.type, st.tmdb.id).then(d=>{
     const ps = ((d.images&&d.images.posters)||[]).slice(0,40);
@@ -863,13 +884,14 @@ function openDetail(id){
   html += `<div class="btns" style="margin-top:18px">`;
   if (!done) html += `<button class="btn p" id="dDone">${isPlace?"📍 Fomos!":"✓ Assistimos"}</button>`;
   if (!isPlace) html += `<button class="btn g" id="dFolder">📁 Salvar em pasta${(()=>{ const n=S.folders.filter(f=>(f.entries||[]).some(x=>x.key===entryOfItem(it).key)).length; return n?` (${n})`:""; })()}</button>`;
-  html += `<div class="btns h"><button class="btn g" id="dEdit">Editar</button><button class="btn g d" id="dDel">Apagar</button></div></div>`;
+  html += `<div class="btns h"><button class="btn g" id="dEdit">Editar</button><button class="btn g d" id="dDel">Apagar</button></div><button class="btn g" id="dClose">Fechar</button></div>`;
 
   openSheet(html, root=>{
     root.querySelector("#dRev") && (root.querySelector("#dRev").onclick = ()=>openReview(it, false));
     root.querySelector("#dDone") && (root.querySelector("#dDone").onclick = ()=>openReview(it, true));
     root.querySelector("#dEdit").onclick = ()=> isPlace ? openPlaceForm(it.status, it) : openWatchForm(it.status, it);
     root.querySelector("#dDel").onclick = ()=>confirmDelete(it);
+    root.querySelector("#dClose").onclick = closeSheet;
     root.querySelector("#dFolder") && (root.querySelector("#dFolder").onclick = ()=>openSaveToFolder(it));
     root.querySelectorAll("[data-react]").forEach(b=>b.onclick = async ()=>{
       const r = it.reviews[b.dataset.react]; r.reactions = { ...(r.reactions||{}) };
@@ -1135,8 +1157,9 @@ function openProfileEdit(){
 // sobreposição de busca no TMDB (type: movie | tv | multi)
 function overlaySheet(html){
   const ov = document.createElement("div"); ov.className = "sheet-bg show"; ov.style.zIndex = 30;
-  ov.innerHTML = `<div class="sheet"><div class="grab"></div>${html}</div>`;
+  ov.innerHTML = `<div class="sheet"><button class="sheet-x" aria-label="Fechar">✕</button><div class="grab"></div>${html}</div>`;
   document.body.appendChild(ov); ov.addEventListener("click", e=>{ if(e.target===ov) ov.remove(); });
+  ov.querySelector(".sheet-x").onclick = ()=>ov.remove(); swipeToClose(ov.querySelector(".sheet"), ()=>ov.remove());
   return ov;
 }
 function openTmdbSearch(type, title, onPick){
