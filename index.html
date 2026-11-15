@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="4">
+<meta name="app-version" content="5">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -280,7 +280,7 @@ const TMDB = {
   async get(path, params={}){
     const key = CFG.tmdbKey, bearer = key.length > 60;
     const u = new URL("https://api.themoviedb.org/3"+path);
-    Object.entries({ language:"pt-BR", ...params }).forEach(([k,v])=>u.searchParams.set(k,v));
+    Object.entries({ language:"pt-BR", ...params }).forEach(([k,v])=>{ if (v!=="" && v!=null) u.searchParams.set(k,v); });
     if (!bearer) u.searchParams.set("api_key", key);
     const r = await fetch(u, bearer ? { headers:{ Authorization:"Bearer "+key } } : {});
     if (!r.ok) throw new Error("tmdb "+r.status);
@@ -291,6 +291,21 @@ const TMDB = {
     return (d.results||[]).map(r=>({ ...r, media_type:type })).slice(0,8);
   },
   _cache: {},
+  async genres(type){ const k="g"+type; if(!this._cache[k]) this._cache[k]=(await this.get(`/genre/${type}/list`)).genres||[]; return this._cache[k]; },
+  async providers(type){
+    const k="p"+type; if(this._cache[k]) return this._cache[k];
+    const d = await this.get(`/watch/providers/${type}`, { watch_region:"BR" });
+    const list = (d.results||[]).sort((a,b)=>((a.display_priorities||{}).BR??a.display_priority??99)-((b.display_priorities||{}).BR??b.display_priority??99));
+    const seen = new Set(), out = [];
+    for (const p of list){ const n = matchPlatform(p.provider_name); if (seen.has(n) || /amazon channel|apple tv channel|with ads|standard|basic/i.test(p.provider_name)) continue; seen.add(n); out.push({ id:p.provider_id, name:n, logo:p.logo_path }); if (out.length>=14) break; }
+    return this._cache[k] = out;
+  },
+  discover(type, genres, provs, page){
+    return this.get(`/discover/${type}`, { sort_by:"popularity.desc", include_adult:"false", watch_region:"BR",
+      with_genres: genres.join("|"), with_watch_providers: provs.join("|"),
+      with_watch_monetization_types: provs.length ? "flatrate|free|ads" : "",
+      "vote_count.gte": type==="movie" ? "80" : "40", page });
+  },
   async details(type, id){
     const k = type+id; if (this._cache[k]) return this._cache[k];
     const d = await this.get(`/${type}/${id}`, { append_to_response:"watch/providers,images", include_image_language:"pt,en,null" });
@@ -401,7 +416,7 @@ function viewWatch(tab){
     .sort((a,b)=> f==="done" ? doneAt(b)-doneAt(a) : (b.createdAt||0)-(a.createdAt||0));
   let h = segHTML(segs, f, tab);
   if (genres.length) h += `<div class="seg" style="padding-top:2px">${[["","Todos os gêneros"], ...genres.map(g=>[g,g])].map(([k,l])=>`<button class="chip ${gsel===k?"on":""}" data-genre="${esc(k)}" style="font-size:13px;padding:6px 12px">${esc(l)}</button>`).join("")}</div>`;
-  h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off">${f!=="done" && todo.length ? `<button class="btn g" id="rollBtn">🎲 Sortear</button>`:""}</div>`;
+  h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off">${f!=="done" ? `<button class="btn g" id="rollBtn">🎲 Sortear</button>`:""}</div>`;
   const word = mt==="filme" ? "filme" : "série";
   if (!list.length){
     if (base.length) return h + emptyHTML("🔎", "Nada encontrado com esse filtro.");
@@ -883,37 +898,116 @@ function confirmDelete(it){
 
 // ---------- sorteio ----------
 function openRoll(){
-  const mt = S.tab==="series" ? "serie" : "filme";
+  const mt = S.tab==="series" ? "serie" : "filme", tt = mt==="serie" ? "tv" : "movie";
   const pool0 = S.items.filter(i=>i.kind==="watch" && i.status==="todo" && i.mediaType===mt);
-  if (!pool0.length) return toast("Não tem nada na lista pra sortear ainda");
   const f = S.filter[S.tab], defWho = ["forme","forpartner","together"].includes(f) ? f : "all";
   const genres = [...new Set(pool0.flatMap(i=>i.genres||[]))].sort();
   const plats = [...new Set(pool0.map(i=>i.platform).filter(Boolean))];
+  let mode = pool0.length ? "list" : "hot";
   openSheet(`<h2>🎲 ${mt==="serie"?"Qual série hoje?":"Qual filme hoje?"}</h2>
-    <div class="field"><label>De qual lista</label>${chipsInput("rwho", [["all","Todas"],["forme","Pra mim"],["forpartner","Pra "+pName()],["together","Juntos"]], defWho)}</div>
-    ${genres.length?`<div class="field"><label>Gênero</label>${chipsInput("rgen", [["","Qualquer"], ...genres.map(g=>[g,g])], "")}</div>`:""}
-    ${plats.length?`<div class="field"><label>Plataforma</label>${chipsInput("rplat", [["","Qualquer"], ...plats.map(p=>[p,p])], "")}</div>`:""}
+    <div class="seg" style="margin-top:-6px">${[["list","📋 Da nossa lista"],["hot","🔥 Em alta agora"]].map(([k,l])=>`<button class="chip ${mode===k?"on":""}" data-mode="${k}">${l}</button>`).join("")}</div>
+    <div id="mList">
+      ${pool0.length ? `
+      <div class="field"><label>De qual lista</label>${chipsInput("rwho", [["all","Todas"],["forme","Pra mim"],["forpartner","Pra "+pName()],["together","Juntos"]], defWho)}</div>
+      ${genres.length?`<div class="field"><label>Gênero</label>${chipsInput("rgen", [["","Qualquer"], ...genres.map(g=>[g,g])], "")}</div>`:""}
+      ${plats.length?`<div class="field"><label>Plataforma</label>${chipsInput("rplat", [["","Qualquer"], ...plats.map(p=>[p,p])], "")}</div>`:""}`
+      : `<div class="small" style="margin:10px 0">A lista de vocês está vazia — experimente o 🔥 Em alta.</div>`}
+    </div>
+    <div id="mHot" style="display:none">
+      <p class="small" style="margin:4px 0 12px">${mt==="serie"?"Séries":"Filmes"} mais populares do momento. Escolha quantos gêneros e plataformas quiser — ou nenhum, pra valer qualquer um.</p>
+      <div class="field"><label>Gêneros</label><div id="hGen" class="small">Carregando…</div></div>
+      <div class="field"><label>Plataformas</label><div id="hProv" class="small">Carregando…</div></div>
+    </div>
     <div id="rollOut"></div>
     <div class="btns"><button class="btn p" id="rollGo">Sortear</button><button class="btn g" id="rollX">Fechar</button></div>`, root=>{
     wireChips(root); root.querySelectorAll("[data-chips]").forEach(b=>b.setAttribute("data-req",""));
     root.querySelector("#rollX").onclick = closeSheet;
-    root.querySelector("#rollGo").onclick = ()=>{
+    const out = root.querySelector("#rollOut"), go = root.querySelector("#rollGo");
+    let hotLoaded = false;
+    const setMode = m => {
+      mode = m; out.innerHTML = ""; go.textContent = "Sortear"; go.disabled = (m==="list" && !pool0.length);
+      root.querySelectorAll("[data-mode]").forEach(b=>b.classList.toggle("on", b.dataset.mode===m));
+      root.querySelector("#mList").style.display = m==="list" ? "block" : "none";
+      root.querySelector("#mHot").style.display = m==="hot" ? "block" : "none";
+      if (m==="hot" && !hotLoaded){ hotLoaded = true; loadHot(); }
+    };
+    root.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+    async function loadHot(){
+      if (!TMDB.ok()){ root.querySelector("#hGen").textContent = "Configure a chave do TMDB."; root.querySelector("#hProv").textContent=""; return; }
+      try {
+        const [gs, ps] = await Promise.all([TMDB.genres(tt), TMDB.providers(tt)]);
+        root.querySelector("#hGen").outerHTML = `<div class="chips" data-multi="hgen">${gs.map(g=>`<button type="button" class="chip" data-v="${g.id}">${esc(g.name)}</button>`).join("")}</div>`;
+        root.querySelector("#hProv").outerHTML = `<div class="chips" data-multi="hprov">${ps.map(p=>`<button type="button" class="chip" data-v="${p.id}" style="display:flex;align-items:center;gap:6px;padding-left:6px">${p.logo?`<img src="${IMG}w92${esc(p.logo)}" style="width:20px;height:20px;border-radius:5px" alt="">`:""}${esc(p.name)}</button>`).join("")}</div>`;
+        wireMulti(root.querySelector("#mHot"));
+      } catch(e){ root.querySelector("#hGen").textContent = "Não consegui carregar agora."; root.querySelector("#hProv").textContent=""; }
+    }
+    const spin = (titles, done) => { let n=0; const steps=Math.min(14, 6+titles.length); const t=()=>{ if(n++<steps){ out.innerHTML=`<div class="roll">${esc(titles[Math.floor(Math.random()*titles.length)])}</div>`; setTimeout(t, 60+n*12); } else done(); }; t(); };
+
+    function rollList(){
       const who = chipVal(root,"rwho"), plat = chipVal(root,"rplat"), gen = chipVal(root,"rgen");
       const wf = { forme:forMeFn, forpartner:forPartnerFn, together:togetherFn }[who];
       const pool = pool0.filter(i => (!wf || wf(i)) && (!plat || i.platform===plat) && (!gen || (i.genres||[]).includes(gen)));
-      const out = root.querySelector("#rollOut");
       if (!pool.length){ out.innerHTML = `<div class="small" style="margin:8px 0 12px">Nada com esses filtros.</div>`; return; }
-      let n = 0; const steps = Math.min(14, 6+pool.length);
-      const tick = ()=>{
-        const it = pool[Math.floor(Math.random()*pool.length)];
-        if (n++ < steps){ out.innerHTML = `<div class="roll">${esc(it.title)}</div>`; setTimeout(tick, 60+n*12); return; }
+      const it = pool[Math.floor(Math.random()*pool.length)];
+      spin(pool.map(i=>i.title), ()=>{
         out.innerHTML = `<div class="pick-card">${coverHTML(it)}<h3>${esc(it.title)}</h3><div>${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}${progTag(it)}</div>
           ${it.note?`<p class="small">“${esc(it.note)}”</p>`:""}<button class="btn g sm" id="rollOpen" style="margin:10px 0 6px">Ver detalhes</button></div>`;
-        root.querySelector("#rollGo").textContent = "Sortear de novo";
+        go.textContent = "Sortear de novo";
         root.querySelector("#rollOpen").onclick = ()=>openDetail(it.id);
-      };
-      tick();
-    };
+      });
+    }
+
+    const hotCache = {}; const shown = new Set();
+    async function rollHot(){
+      const gs = getMulti(root,"hgen"), ps = getMulti(root,"hprov");
+      const key = gs.join(",")+"|"+ps.join(",");
+      const known = new Set(S.items.filter(i=>i.tmdbId).map(i=>i.tmdbType+i.tmdbId));
+      go.disabled = true; out.innerHTML = `<div class="roll">Procurando…</div>`;
+      try {
+        if (!hotCache[key]){
+          const first = await TMDB.discover(tt, gs, ps, 1);
+          const pages = Math.min(5, first.total_pages||1);
+          const rest = pages>1 ? await Promise.all([...Array(pages-1)].map((_,i)=>TMDB.discover(tt, gs, ps, i+2).catch(()=>({results:[]})))) : [];
+          hotCache[key] = [first, ...rest].flatMap(d=>d.results||[]);
+        }
+        let pool = hotCache[key].filter(r=>!known.has(tt+r.id));
+        if (!pool.length){ out.innerHTML = `<div class="small" style="margin:8px 0 12px">Nada encontrado com essa combinação. Tente tirar algum filtro.</div>`; go.disabled=false; return; }
+        let fresh = pool.filter(r=>!shown.has(r.id)); if (!fresh.length){ shown.clear(); fresh = pool; }
+        const r = fresh[Math.floor(Math.random()*fresh.length)]; shown.add(r.id);
+        spin(pool.map(x=>x.title||x.name), async ()=>{
+          const title = r.title||r.name, year = (r.release_date||r.first_air_date||"").slice(0,4);
+          out.innerHTML = `<div class="pick-card">
+            <div class="cover"><img src="${IMG}w342${esc(r.poster_path||"")}" alt=""></div>
+            <h3>${esc(title)}</h3>
+            <div class="meta" style="margin-bottom:8px">${[year, r.vote_average?`★ ${r.vote_average.toFixed(1)} no TMDB`:""].filter(Boolean).join(" · ")}</div>
+            ${r.overview?`<p class="small" style="text-align:left;-webkit-line-clamp:5;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden">${esc(r.overview)}</p>`:""}
+            <div id="hotProv" style="text-align:left;margin:10px 0"><div class="small">Buscando onde assistir…</div></div>
+            <div class="field" style="text-align:left"><label>Adicionar em</label>${chipsInput("hfor", [["both","💑 Juntos"],["self","🙋 Eu quero ver"],["other","💌 Pra "+pName()]], "both")}</div>
+            <button class="btn g" id="hotAdd" style="margin-bottom:6px">➕ Adicionar à lista</button></div>`;
+          go.textContent = "Sortear outro"; go.disabled = false;
+          const box = out.querySelector('[data-chips="hfor"]'); box.setAttribute("data-req",""); wireChips(out);
+          let det = null;
+          try { det = await TMDB.details(tt, r.id); out.querySelector("#hotProv").innerHTML = provsHTML(provsBR(det)); }
+          catch(_){ out.querySelector("#hotProv").innerHTML = ""; }
+          out.querySelector("#hotAdd").onclick = async e=>{
+            e.target.disabled = true;
+            try {
+              const d = det || await TMDB.details(tt, r.id), p = provsBR(d);
+              const first = p && p.stream[0] && matchPlatform(p.stream[0].name);
+              const data = { kind:"watch", status:"todo", mediaType:mt, title, year, poster:r.poster_path||"", cover:"", backdrop:r.backdrop_path||"",
+                overview:d.overview||r.overview||"", genres:(d.genres||[]).map(g=>normGenre(g.name)).flat().filter((g,i,a)=>a.indexOf(g)===i).slice(0,3),
+                runtime:d.runtime||0, seasons:d.number_of_seasons||0, tmdbId:r.id, tmdbType:tt,
+                platform: first || (p && (p.rent.length||p.buy.length) ? "Aluguel/Compra" : ""),
+                recFor: chipVal(out,"hfor")||"both", note:"", createdBy:S.me, createdAt:Date.now(), reviews:{} };
+              await API.add("items", data);
+              e.target.textContent = "✓ Adicionado"; toast(data.recFor==="other" ? `Indicado pra ${pName()} 💌` : "Adicionado à lista ✓");
+            } catch(err){ e.target.disabled = false; writeErr(err); }
+          };
+        });
+      } catch(e){ out.innerHTML = `<div class="small" style="margin:8px 0 12px">Não consegui buscar agora.</div>`; go.disabled=false; }
+    }
+    go.onclick = ()=> mode==="hot" ? rollHot() : rollList();
+    setMode(mode);
   });
 }
 
