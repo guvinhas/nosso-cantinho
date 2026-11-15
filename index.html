@@ -203,8 +203,8 @@ nav button.on .i{filter:none;opacity:1}
 <button class="fab" id="fab" aria-label="Adicionar" style="display:none">+</button>
 
 <nav id="nav" style="display:none">
-  <button data-tab="watched"><span class="i">🎬</span>Assistidos</button>
-  <button data-tab="recs"><span class="i">💌</span>Indicações</button>
+  <button data-tab="movies"><span class="i">🎬</span>Filmes</button>
+  <button data-tab="series"><span class="i">📺</span>Séries</button>
   <button data-tab="places"><span class="i">📍</span>Lugares</button>
   <button data-tab="us"><span class="i">💛</span>Nós</button>
 </nav>
@@ -215,7 +215,8 @@ nav button.on .i{filter:none;opacity:1}
 <script src="config.js"></script>
 <script type="module">
 // =============== constantes ===============
-const PLATFORMS = ["Netflix","Prime Video","Disney+","Max","Apple TV+","Globoplay","Paramount+","YouTube","Cinema","Outro"];
+const PLATFORMS = ["Netflix","Prime Video","Disney+","Max","Apple TV+","Globoplay","Paramount+","YouTube","Cinema","Aluguel/Compra","Outro"];
+const GENRES = ["Ação","Aventura","Animação","Comédia","Crime","Documentário","Drama","Família","Fantasia","Ficção científica","Guerra","História","Mistério","Musical","Romance","Suspense","Terror","Faroeste","Reality","Anime"];
 const PLACE_CATS = ["Restaurante","Bar","Café","Passeio","Viagem","Parque","Museu","Show/Evento","Outro"];
 const REACTIONS = ["❤️","😂","😭","🔥","👏","🤔"];
 const THEMES = {coral:"#ff7a59", rosa:"#ff5c8a", roxo:"#a77bff", azul:"#4fa3ff", verde:"#3ecf8e", dourado:"#e8b04b"};
@@ -225,8 +226,9 @@ const MESES_L = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","
 
 const CFG = window.APP_CONFIG || {};
 const S = {
-  tab: ["recs","places","us"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "watched",
-  filter: { watched:"all", recs:"forme", places:"todo" },
+  tab: ["series","places","us"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "movies",
+  filter: { movies:"forme", series:"forme", places:"todo" },
+  genre: { movies:"", series:"" },
   q: "", year: new Date().getFullYear(),
   items: [], people: {}, settings: {}, goals: [],
   me: null, email: "", loaded: false, splashed: false
@@ -282,9 +284,9 @@ const TMDB = {
     if (!r.ok) throw new Error("tmdb "+r.status);
     return r.json();
   },
-  async search(q){
-    const d = await this.get("/search/multi", { query:q, include_adult:"false", region:"BR" });
-    return (d.results||[]).filter(r=>r.media_type==="movie"||r.media_type==="tv").slice(0,8);
+  async search(q, type){
+    const d = await this.get("/search/"+type, { query:q, include_adult:"false", region:"BR" });
+    return (d.results||[]).map(r=>({ ...r, media_type:type })).slice(0,8);
   },
   _cache: {},
   async details(type, id){
@@ -301,10 +303,16 @@ function provsBR(d){
 }
 function provsHTML(p){
   if (!p) return `<div class="small">Não encontramos onde assistir no Brasil agora.</div>`;
-  const g = (t, list) => list.length ? `<div class="prov-group"><div class="meta">${t}</div><div class="provs">${list.map(x=>`<span class="prov">${x.logo?`<img src="${IMG}w92${esc(x.logo)}" alt="">`:""}${esc(x.name)}</span>`).join("")}</div></div>` : "";
-  const h = g("No streaming", p.stream) + g("Alugar", p.rent) + g("Comprar", p.buy);
-  return (h || `<div class="small">Não está disponível em nenhuma plataforma no Brasil agora.</div>`) +
-    (p.link ? `<div class="attr">Dados de disponibilidade: <a href="${esc(p.link)}" target="_blank" rel="noopener">JustWatch</a> via TMDB</div>` : "");
+  const g = (t, list) => list.length ? `<div class="prov-group">${t?`<div class="meta">${t}</div>`:""}<div class="provs">${list.map(x=>`<span class="prov">${x.logo?`<img src="${IMG}w92${esc(x.logo)}" alt="">`:""}${esc(x.name)}</span>`).join("")}</div></div>` : "";
+  const paid = g("Alugar", p.rent) + g("Comprar", p.buy);
+  let h;
+  if (p.stream.length){
+    h = g("No streaming", p.stream);
+    if (paid) h += `<button type="button" class="small" style="text-decoration:underline;margin:-2px 0 8px" onclick="this.nextElementSibling.style.display='block';this.remove()">Ver opções de aluguel e compra</button><div style="display:none">${paid}</div>`;
+  } else if (paid){
+    h = `<div class="small" style="margin-bottom:8px">Não está em nenhum streaming agora — dá pra alugar ou comprar:</div>` + paid;
+  } else h = `<div class="small">Não está disponível em nenhuma plataforma no Brasil agora.</div>`;
+  return h + (p.link ? `<div class="attr">Dados de disponibilidade: <a href="${esc(p.link)}" target="_blank" rel="noopener">JustWatch</a> via TMDB</div>` : "");
 }
 
 // =============== helpers de UI ===============
@@ -329,8 +337,19 @@ const progTag = it => it.progress && it.progress.s ? `<span class="tag acc">T${i
 const match = it => { const q=S.q.trim().toLowerCase(); return !q || (it.title||"").toLowerCase().includes(q) || (it.city||"").toLowerCase().includes(q); };
 const segHTML = (opts, cur, key) => `<div class="seg">${opts.map(([k,l])=>`<button class="chip ${cur===k?"on":""}" data-seg="${key}" data-val="${k}">${l}</button>`).join("")}</div>`;
 const emptyHTML = (icon, text) => `<div class="empty"><div class="big">${icon}</div>${text}</div>`;
-const forMeFn = i => i.recFor===S.me;
+// recFor: "other" = pro outro (quem não criou) · "self" = quem criou quer ver · "both" = juntos
+const isMine = i => i.createdBy===S.me;
+const forMeFn = i => i.recFor==="other" ? !isMine(i) : i.recFor==="self" ? isMine(i) : i.recFor===S.me;
+const forPartnerFn = i => i.recFor==="other" ? isMine(i) : i.recFor==="self" ? !isMine(i) : (!!i.recFor && i.recFor!=="both" && i.recFor!==S.me);
 const togetherFn = i => i.recFor==="both" || !i.recFor;
+const watchingFn = i => i.progress && i.progress.s;
+const pName = () => other() ? nameRaw(other()) : "ele(a)";
+function whoText(it){
+  const pn = esc(pName()), cn = esc(nameRaw(it.createdBy));
+  if (togetherFn(it)) return isMine(it) ? "Você sugeriu pra vocês dois" : `${cn} sugeriu pra vocês dois`;
+  if (isMine(it)) return forMeFn(it) ? "Você quer ver" : `Você indicou pra ${pn}`;
+  return forMeFn(it) ? `${cn} indicou pra você` : `${cn} quer ver`;
+}
 
 function applyTheme(){
   const c = THEMES[S.settings.theme] || THEMES.coral;
@@ -341,59 +360,60 @@ function applyTheme(){
 function render(){
   if (!S.me) return;
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===S.tab));
-  $("#pageTitle").textContent = {watched:"Assistidos", recs:"Indicações", places:"Lugares", us:"Nós dois"}[S.tab];
+  $("#pageTitle").textContent = {movies:"Filmes", series:"Séries", places:"Lugares", us:"Nós dois"}[S.tab];
   const o = other(), st = S.settings;
   $("#hello").textContent = st.title || (o ? `${nameRaw(S.me)} & ${nameRaw(o)}` : `Oi, ${nameRaw(S.me)}`);
   const av = $("#hdrAv"); if (st.photo){ av.src = st.photo; av.style.display="block"; } else av.style.display="none";
   const v = $("#view");
-  v.innerHTML = S.tab==="watched" ? viewWatched() : S.tab==="recs" ? viewRecs() : S.tab==="places" ? viewPlaces() : viewUs();
+  v.innerHTML = S.tab==="movies"||S.tab==="series" ? viewWatch(S.tab) : S.tab==="places" ? viewPlaces() : viewUs();
   const si = $("#q"); if (si){ si.value=S.q; si.oninput=e=>{ S.q=e.target.value; const p=e.target.selectionStart; render(); const n=$("#q"); n.focus(); try{n.setSelectionRange(p,p);}catch(_){} }; }
   $("#fab").style.display = S.tab==="us" ? "none" : "flex";
 }
 
-function viewWatched(){
-  const all = S.items.filter(i=>i.kind==="watch" && i.status==="done");
-  const f = S.filter.watched;
-  const list = all.filter(i => f==="all" || (f==="fav" ? Object.values(i.reviews||{}).some(r=>r&&r.rating>=5) : i.mediaType===f)).filter(match)
-    .sort((a,b)=>doneAt(b)-doneAt(a));
-  const films = all.filter(i=>i.mediaType==="filme").length;
-  let h = segHTML([["all","Tudo"],["filme","Filmes"],["serie","Séries"],["fav","★ 5 estrelas"]], f, "watched");
-  h += `<div class="toolbar"><input id="q" placeholder="Buscar pelo nome…" autocomplete="off"></div>`;
-  h += `<div class="stats"><span><b>${films}</b> filmes</span><span><b>${all.length-films}</b> séries</span></div>`;
-  if (!list.length) return h + emptyHTML("🍿", all.length ? "Nada encontrado com esse filtro." : "Nenhum filme ou série por aqui ainda.<br>Toque no <b>+</b> pra registrar o que vocês já assistiram.");
-  return h + `<div class="grid">${list.map(it=>`
-    <button class="poster" data-open="${esc(it.id)}">
-      ${coverHTML(it, it.mediaType==="serie"?'<span class="badge">SÉRIE</span>':"")}
-      <div class="t">${esc(it.title)}</div>
-      <div class="s">${starStr(avgRating(it))}</div>
-    </button>`).join("")}</div>`;
-}
-
 function recRow(it){
-  const who = it.createdBy===S.me
-    ? (it.recFor==="both"||!it.recFor ? "Você sugeriu pra vocês dois" : `Você indicou pra ${esc(nameOf(it.recFor))}`)
-    : (it.recFor===S.me ? `${esc(nameOf(it.createdBy))} indicou pra você` : `${esc(nameOf(it.createdBy))} sugeriu pra vocês dois`);
   return `<button class="row" data-open="${esc(it.id)}">
     ${coverHTML(it)}
     <div class="body">
       <div class="title">${esc(it.title)}${it.year?` <span class="meta">${esc(it.year)}</span>`:""}</div>
-      <div>${progTag(it)}<span class="tag">${it.mediaType==="serie"?"Série":"Filme"}</span>${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}</div>
-      <div class="from">${who}</div>
+      <div>${progTag(it)}${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}${(it.genres||[]).slice(0,2).map(g=>`<span class="tag">${esc(g)}</span>`).join("")}</div>
+      <div class="from">${whoText(it)}</div>
       ${it.note?`<div class="note">“${esc(it.note)}”</div>`:""}
     </div></button>`;
 }
-function viewRecs(){
-  const all = S.items.filter(i=>i.kind==="watch" && i.status==="todo");
-  const f = S.filter.recs;
-  const fn = { forme:forMeFn, together:togetherFn, mine:i=>i.createdBy===S.me && i.recFor && i.recFor!=="both", watching:i=>i.progress&&i.progress.s, all:()=>true }[f] || (()=>true);
-  const list = all.filter(fn).filter(match).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  const c = fn2 => { const n = all.filter(fn2).length; return n ? ` (${n})` : ""; };
-  let h = segHTML([["forme","Pra mim"+c(forMeFn)],["together","Juntos"+c(togetherFn)],["watching","Assistindo"+c(i=>i.progress&&i.progress.s)],["mine","Que eu indiquei"],["all","Todas"]], f, "recs");
-  h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off"><button class="btn g" id="rollBtn">🎲 Sortear</button></div>`;
+function viewWatch(tab){
+  const mt = tab==="movies" ? "filme" : "serie";
+  const all = S.items.filter(i=>i.kind==="watch" && i.mediaType===mt);
+  const todo = all.filter(i=>i.status==="todo"), done = all.filter(i=>i.status==="done");
+  const cnt = n => n ? ` (${n})` : "";
+  const segs = [];
+  if (mt==="serie") segs.push(["watching","▶ Assistindo"+cnt(todo.filter(watchingFn).length)]);
+  segs.push(["forme","Pra mim"+cnt(todo.filter(forMeFn).length)], ["forpartner","Pra "+esc(pName())+cnt(todo.filter(forPartnerFn).length)],
+    ["together","Juntos"+cnt(todo.filter(togetherFn).length)], ["done","✓ Assistidos"+cnt(done.length)]);
+  let f = S.filter[tab]; if (!segs.find(x=>x[0]===f)) f = S.filter[tab] = "forme";
+  const fn = { watching:watchingFn, forme:forMeFn, forpartner:forPartnerFn, together:togetherFn }[f];
+  const base = f==="done" ? done : todo.filter(fn);
+  const genres = [...new Set(base.flatMap(i=>i.genres||[]))].sort((a,b)=>a.localeCompare(b));
+  if (S.genre[tab] && !genres.includes(S.genre[tab])) S.genre[tab] = "";
+  const gsel = S.genre[tab];
+  const list = base.filter(i=>!gsel || (i.genres||[]).includes(gsel)).filter(match)
+    .sort((a,b)=> f==="done" ? doneAt(b)-doneAt(a) : (b.createdAt||0)-(a.createdAt||0));
+  let h = segHTML(segs, f, tab);
+  if (genres.length) h += `<div class="seg" style="padding-top:2px">${[["","Todos os gêneros"], ...genres.map(g=>[g,g])].map(([k,l])=>`<button class="chip ${gsel===k?"on":""}" data-genre="${esc(k)}" style="font-size:13px;padding:6px 12px">${esc(l)}</button>`).join("")}</div>`;
+  h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off">${f!=="done" && todo.length ? `<button class="btn g" id="rollBtn">🎲 Sortear</button>`:""}</div>`;
+  const word = mt==="filme" ? "filme" : "série";
   if (!list.length){
-    const msg = { forme:"Nenhuma indicação pra você ainda.<br>Pede pro seu amor indicar alguma coisa!", together:"Nada na lista de vocês dois ainda.<br>Toque no <b>+</b> e escolha “Nós dois”.", watching:"Nenhuma série em andamento.<br>Abra uma série e marque em que episódio vocês pararam." }[f] || "Toque no <b>+</b> pra indicar um filme ou série.";
-    return h + emptyHTML("💌", msg);
+    if (base.length) return h + emptyHTML("🔎", "Nada encontrado com esse filtro.");
+    const msg = {
+      watching: "Nenhuma série em andamento.<br>Abra uma série e marque em que episódio vocês pararam.",
+      forme: `Nada aqui ainda.<br>Aqui aparece o que ${esc(pName())} indicou pra você — ou toque no <b>+</b> pra anotar ${mt==="filme"?"um filme":"uma série"} que você quer ver.`,
+      forpartner: `Toque no <b>+</b> pra indicar ${mt==="filme"?"um filme":"uma série"} pra ${esc(pName())}.`,
+      together: `Toque no <b>+</b> pra adicionar ${mt==="filme"?"um filme":"uma série"} pra vocês verem juntos.`,
+      done: `Nenhum${mt==="filme"?" filme":"a série"} assistid${mt==="filme"?"o":"a"} ainda.<br>Toque no <b>+</b> pra registrar.`
+    }[f];
+    return h + emptyHTML(f==="done"?"🍿":"💌", msg);
   }
+  if (f==="done") return h + `<div class="stats"><span><b>${done.length}</b> ${word}${done.length!==1?"s":""}</span></div><div class="grid">${list.map(it=>`
+    <button class="poster" data-open="${esc(it.id)}">${coverHTML(it)}<div class="t">${esc(it.title)}</div><div class="s">${starStr(avgRating(it))}</div></button>`).join("")}</div>`;
   return h + `<div class="list">${list.map(recRow).join("")}</div>`;
 }
 
@@ -514,6 +534,17 @@ function wireChips(root, noToggleOff){
     box.dispatchEvent(new Event("change"));
   }));
 }
+const multiInput = (name, opts, cur) => `<div class="chips" data-multi="${name}">${opts.map(o=>`<button type="button" class="chip ${(cur||[]).includes(o)?"on":""}" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
+function wireMulti(root){ root.querySelectorAll("[data-multi]").forEach(box=>box.addEventListener("click", e=>{ const b=e.target.closest("button"); if(b) b.classList.toggle("on"); })); }
+const getMulti = (root, name) => [...root.querySelectorAll(`[data-multi="${name}"] .chip.on`)].map(b=>b.dataset.v);
+function setMulti(root, name, vals){ const box=root.querySelector(`[data-multi="${name}"]`); if(!box) return;
+  vals.forEach(v=>{ if(![...box.children].some(b=>b.dataset.v===v)){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.dataset.v=v; b.textContent=v; box.prepend(b); } });
+  box.querySelectorAll(".chip").forEach(b=>b.classList.toggle("on", vals.includes(b.dataset.v))); }
+function normGenre(g){
+  const m = { "Action & Adventure":["Ação","Aventura"], "Ação e Aventura":["Ação","Aventura"], "Sci-Fi & Fantasy":["Ficção científica","Fantasia"], "Ficção Científica e Fantasia":["Ficção científica","Fantasia"],
+    "Ficção científica":["Ficção científica"], "Ficção Científica":["Ficção científica"], "War & Politics":["Guerra"], "Guerra e Política":["Guerra"], "Kids":["Família"], "Música":["Musical"], "Thriller":["Suspense"], "Cinema TV":[], "Talk":[], "News":[], "Soap":["Drama"], "Novela":["Drama"] };
+  return m[g] || [g];
+}
 const chipVal = (root, name) => root.querySelector(`[data-chips="${name}"]`)?.dataset.val || "";
 const val = (root, sel) => (root.querySelector(sel)?.value || "").trim();
 
@@ -536,23 +567,28 @@ function shrink(file, square, W=360){
 }
 
 // ---------- formulário de filme/série com busca TMDB ----------
-function openWatchForm(status, it){
+function openWatchForm(status, it, mt, defFor){
   const editing = !!it; it = it || {};
   const st = { tmdb: it.tmdbId ? { id:it.tmdbId, type:it.tmdbType } : null, poster: it.poster||"", cover: it.cover||"", backdrop: it.backdrop||"",
-    title: it.title||"", year: it.year||"", mediaType: it.mediaType||"filme", overview: it.overview||"", genres: it.genres||[], runtime: it.runtime||0, seasons: it.seasons||0, providers: null };
-  const o = other(), isRec = status==="todo";
-  const html = `<h2>${editing?"Editar":isRec?"Nova indicação":"Já assistimos"}</h2>
+    title: it.title||"", year: it.year||"", mediaType: it.mediaType||mt||"filme", overview: it.overview||"", genres: it.genres||[], runtime: it.runtime||0, seasons: it.seasons||0, providers: null };
+  const isRec = status==="todo";
+  const word = st.mediaType==="serie" ? "série" : "filme";
+  const forVal = editing ? (togetherFn(it) ? "both" : forMeFn(it) ? "self" : "other") : (defFor || "other");
+  const platOpts = PLATFORMS.slice(); if (it.platform && !platOpts.includes(it.platform)) platOpts.splice(-2,0,it.platform);
+  const genreOpts = [...new Set(GENRES.concat(st.genres))];
+  const html = `<h2>${editing?"Editar":isRec?(st.mediaType==="serie"?"Nova série na lista":"Novo filme na lista"):(st.mediaType==="serie"?"Série que assistimos":"Filme que assistimos")}</h2>
     <div id="searchBox" ${editing?'style="display:none"':""}>
-      <div class="field"><input id="tq" placeholder="🔎 Buscar filme ou série…" autocomplete="off" autocapitalize="off"></div>
+      <div class="field"><input id="tq" placeholder="🔎 Buscar ${word}…" autocomplete="off" autocapitalize="off"></div>
       <div class="results" id="tres"></div>
       <p class="small" style="margin-top:10px">${TMDB.ok()?"":"⚠️ Chave do TMDB não configurada — a busca automática está desligada. "}Não achou? <button type="button" id="manual" style="text-decoration:underline;color:var(--ink)">Preencher na mão</button></p>
     </div>
     <div id="formBox" ${editing?"":'style="display:none"'}>
       <div class="picked" id="picked"></div>
       <div class="field" id="manualFields"></div>
-      <div class="field"><label>Onde assistir</label><div id="provBox"></div>${chipsInput("fplat", PLATFORMS, it.platform)}</div>
+      <div class="field"><label>Onde assistir</label><div id="provBox"></div>${chipsInput("fplat", platOpts, it.platform)}</div>
+      <div class="field"><label>Gêneros</label>${multiInput("fgen", genreOpts, st.genres)}</div>
       ${isRec ? `
-        <div class="field"><label>Pra quem</label>${chipsInput("ffor", o ? [[o, nameRaw(o)],["both","Nós dois"]] : [["both","Nós dois"]], editing ? (it.recFor==="both"||!it.recFor?"both":it.recFor) : (o||"both"))}</div>
+        ${!editing || isMine(it) ? `<div class="field"><label>Pra quem</label>${chipsInput("ffor", [["other","💌 Pra "+pName()],["both","💑 Nós dois"],["self","🙋 Eu quero ver"]], forVal)}</div>`:""}
         <div class="field"><label>${editing?"Por que assistir?":"Por que você indica?"}</label><textarea id="fNote" placeholder="Conta por que…">${esc(it.note)}</textarea></div>
       ` : editing ? `
         <div class="field"><label>Quando assistiram</label><input type="date" id="fDate" value="${toISO(doneAt(it))}" max="${today()}"></div>
@@ -565,7 +601,7 @@ function openWatchForm(status, it){
       <div class="btns"><button class="btn p" id="fSave">${editing?"Salvar":isRec?"Enviar indicação 💌":"Adicionar"}</button><button class="btn g" id="fCancel">Cancelar</button></div>
     </div>`;
   openSheet(html, root=>{
-    wireChips(root); wireStars(root);
+    wireChips(root); wireStars(root); wireMulti(root);
     root.querySelector('[data-chips="ffor"]')?.setAttribute("data-req","");
     root.querySelector("#fCancel").onclick = ()=> editing ? openDetail(it.id) : closeSheet();
 
@@ -592,9 +628,12 @@ function openWatchForm(status, it){
         root.querySelector('[data-chips="ftype"]').addEventListener("change", e=>{ st.mediaType=e.currentTarget.dataset.val; drawPicked(); });
       }
     };
-    const setPlat = name => { const box = root.querySelector('[data-chips="fplat"]'); box.dataset.val=name; box.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.v===name)); };
+    const setPlat = name => { const box = root.querySelector('[data-chips="fplat"]');
+      if (![...box.querySelectorAll("button")].some(x=>x.dataset.v===name)){ const b=document.createElement("button"); b.type="button"; b.className="chip"; b.dataset.v=name; b.textContent=name; box.insertBefore(b, box.lastElementChild.previousElementSibling); }
+      box.dataset.val=name; box.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.v===name)); };
 
     async function choose(r){
+      r.media_type = r.media_type || (st.mediaType==="serie" ? "tv" : "movie");
       st.tmdb = { id:r.id, type:r.media_type }; st.title = r.title||r.name; st.year = (r.release_date||r.first_air_date||"").slice(0,4);
       st.mediaType = r.media_type==="tv"?"serie":"filme"; st.poster = r.poster_path||""; st.backdrop = r.backdrop_path||""; st.overview = r.overview||""; st.cover="";
       root.querySelector("#searchBox").style.display="none"; root.querySelector("#formBox").style.display="block";
@@ -602,12 +641,13 @@ function openWatchForm(status, it){
       root.querySelector("#provBox").innerHTML = `<div class="small" style="margin-bottom:8px">Buscando onde assistir…</div>`;
       try {
         const d = await TMDB.details(r.media_type, r.id);
-        st.genres = (d.genres||[]).map(g=>g.name).slice(0,3); st.runtime = d.runtime||0; st.seasons = d.number_of_seasons||0;
+        st.genres = (d.genres||[]).map(g=>normGenre(g.name)).flat().filter((g,i,a)=>a.indexOf(g)===i).slice(0,3); st.runtime = d.runtime||0; st.seasons = d.number_of_seasons||0;
+        setMulti(root, "fgen", st.genres);
         st.overview = d.overview || st.overview;
         const p = provsBR(d); st.providers = p;
         root.querySelector("#provBox").innerHTML = `<div style="margin-bottom:10px">${provsHTML(p)}</div><div class="small" style="margin-bottom:6px">Plataforma principal:</div>`;
         const first = p && p.stream[0] && matchPlatform(p.stream[0].name);
-        if (first) setPlat(first); else if (p && (p.rent.length||p.buy.length)) setPlat("Outro");
+        if (first) setPlat(first); else if (p && (p.rent.length||p.buy.length)) setPlat("Aluguel/Compra");
         drawPicked();
       } catch(e){ root.querySelector("#provBox").innerHTML = ""; }
     }
@@ -623,10 +663,10 @@ function openWatchForm(status, it){
         tmr = setTimeout(async ()=>{
           const my = ++seq; tres.innerHTML = `<div class="small">Buscando…</div>`;
           try {
-            const rs = await TMDB.search(q); if (my!==seq) return;
+            const rs = await TMDB.search(q, st.mediaType==="serie"?"tv":"movie"); if (my!==seq) return;
             tres.innerHTML = rs.length ? rs.map((r,i)=>`<button type="button" class="res" data-i="${i}">
               ${r.poster_path?`<img src="${IMG}w92${esc(r.poster_path)}" alt="">`:`<span class="noimg"></span>`}
-              <span style="min-width:0"><b>${esc(r.title||r.name)}</b><span class="meta">${r.media_type==="tv"?"Série":"Filme"}${(r.release_date||r.first_air_date)?" · "+esc((r.release_date||r.first_air_date).slice(0,4)):""}</span></span></button>`).join("")
+              <span style="min-width:0"><b>${esc(r.title||r.name)}</b><span class="meta">${(r.release_date||r.first_air_date)?esc((r.release_date||r.first_air_date).slice(0,4)):""}${r.overview?" · "+esc(r.overview.slice(0,60))+"…":""}</span></span></button>`).join("")
               : `<div class="small">Nada encontrado. Tente outro nome ou preencha na mão.</div>`;
             tres.querySelectorAll(".res").forEach(b=>b.onclick=()=>choose(rs[+b.dataset.i]));
           } catch(e){ if (my===seq) tres.innerHTML = `<div class="small">Não consegui buscar agora (${esc(e.message)}). Confira a chave do TMDB no config.js.</div>`; }
@@ -639,7 +679,8 @@ function openWatchForm(status, it){
       const data = { title: st.title.trim(), mediaType: st.mediaType, year: st.year, poster: st.poster, cover: st.cover, backdrop: st.backdrop,
         overview: st.overview, genres: st.genres, runtime: st.runtime, seasons: st.seasons,
         tmdbId: st.tmdb ? st.tmdb.id : null, tmdbType: st.tmdb ? st.tmdb.type : null, platform: chipVal(root,"fplat") };
-      if (isRec){ data.recFor = chipVal(root,"ffor") || "both"; data.note = val(root,"#fNote"); }
+      data.genres = getMulti(root, "fgen");
+      if (isRec){ if (root.querySelector('[data-chips="ffor"]')) data.recFor = chipVal(root,"ffor") || "other"; data.note = val(root,"#fNote"); }
       if (root.querySelector("#fDate")){ data.doneAt = fromISO(val(root,"#fDate")); data.occasion = val(root,"#fOcc"); }
       e.target.disabled = true;
       try {
@@ -648,7 +689,10 @@ function openWatchForm(status, it){
         const rate = +(root.querySelector('[data-stars="frate"]')?.dataset.val||0), rev = val(root,"#fRev");
         if (!isRec && (rate||rev)) data.reviews[S.me] = { rating:rate, text:rev, at:Date.now() };
         await API.add("items", data);
-        toast(isRec ? "Indicação enviada 💌" : "Adicionado ✓"); closeSheet();
+        const wantTab = data.mediaType==="serie" ? "series" : "movies";
+        const wantSeg = isRec ? ({other:"forpartner", self:"forme", both:"together"}[data.recFor]) : "done";
+        if (S.tab!==wantTab || S.filter[wantTab]!==wantSeg){ S.tab = wantTab; S.filter[wantTab] = wantSeg; render(); }
+        toast(isRec ? (data.recFor==="other" ? `Indicado pra ${pName()} 💌` : "Adicionado à lista ✓") : "Adicionado ✓"); closeSheet();
       } catch(err){ e.target.disabled=false; writeErr(err); }
     };
   });
@@ -663,7 +707,7 @@ function matchPlatform(name){
   if (n.includes("globo")) return "Globoplay";
   if (n.includes("paramount")) return "Paramount+";
   if (n.includes("youtube")) return "YouTube";
-  return "Outro";
+  return name.replace(/ Amazon Channel$| Apple TV Channel$/,"");
 }
 
 function openPosterPicker(st, done){
@@ -735,7 +779,7 @@ function openDetail(id){
       <div style="margin-top:8px">${progTag(it)}${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}</div>
       ${avgRating(it)?`<div style="color:var(--star);margin-top:8px">${starStr(avgRating(it))}</div>`:""}
       <div class="small" style="margin-top:6px">${done ? `${isPlace?"Fomos":"Assistimos"} em ${fmtDate(doneAt(it))}${it.occasion?` · ${esc(it.occasion)}`:""}` :
-        (!isPlace ? (it.createdBy===S.me ? (it.recFor&&it.recFor!=="both"?`Você indicou pra ${esc(nameOf(it.recFor))}`:"Você sugeriu pra vocês dois") : `${esc(nameOf(it.createdBy))} ${it.recFor===S.me?"indicou pra você":"sugeriu pra vocês dois"}`) : `Adicionado por ${esc(nameOf(it.createdBy))}`)}</div>
+        (!isPlace ? whoText(it) : `Adicionado por ${esc(nameOf(it.createdBy))}`)}</div>
     </div></div>`;
   if (it.note) html += `<div class="sec">${isPlace?"Notas":done?"Por que foi indicado":"Por que assistir"}</div><div class="rev"><p style="margin:0">${esc(it.note)}</p></div>`;
   if (it.overview) html += `<div class="sec">Sinopse</div><div class="overview">${esc(it.overview)}</div>`;
@@ -837,20 +881,24 @@ function confirmDelete(it){
 
 // ---------- sorteio ----------
 function openRoll(){
-  const pool0 = S.items.filter(i=>i.kind==="watch" && i.status==="todo");
-  if (!pool0.length) return toast("Não tem indicação pra sortear ainda");
+  const mt = S.tab==="series" ? "serie" : "filme";
+  const pool0 = S.items.filter(i=>i.kind==="watch" && i.status==="todo" && i.mediaType===mt);
+  if (!pool0.length) return toast("Não tem nada na lista pra sortear ainda");
+  const f = S.filter[S.tab], defWho = ["forme","forpartner","together"].includes(f) ? f : "all";
+  const genres = [...new Set(pool0.flatMap(i=>i.genres||[]))].sort();
   const plats = [...new Set(pool0.map(i=>i.platform).filter(Boolean))];
-  openSheet(`<h2>🎲 O que assistir hoje?</h2>
-    <div class="field"><label>De qual lista</label>${chipsInput("rwho", [["all","Todas"],["forme","Pra mim"],["together","Juntos"]], "all")}</div>
+  openSheet(`<h2>🎲 ${mt==="serie"?"Qual série hoje?":"Qual filme hoje?"}</h2>
+    <div class="field"><label>De qual lista</label>${chipsInput("rwho", [["all","Todas"],["forme","Pra mim"],["forpartner","Pra "+pName()],["together","Juntos"]], defWho)}</div>
+    ${genres.length?`<div class="field"><label>Gênero</label>${chipsInput("rgen", [["","Qualquer"], ...genres.map(g=>[g,g])], "")}</div>`:""}
     ${plats.length?`<div class="field"><label>Plataforma</label>${chipsInput("rplat", [["","Qualquer"], ...plats.map(p=>[p,p])], "")}</div>`:""}
-    <div class="field"><label>Tipo</label>${chipsInput("rtype", [["","Tanto faz"],["filme","Filme"],["serie","Série"]], "")}</div>
     <div id="rollOut"></div>
     <div class="btns"><button class="btn p" id="rollGo">Sortear</button><button class="btn g" id="rollX">Fechar</button></div>`, root=>{
     wireChips(root); root.querySelectorAll("[data-chips]").forEach(b=>b.setAttribute("data-req",""));
     root.querySelector("#rollX").onclick = closeSheet;
     root.querySelector("#rollGo").onclick = ()=>{
-      const who = chipVal(root,"rwho"), plat = chipVal(root,"rplat"), type = chipVal(root,"rtype");
-      const pool = pool0.filter(i => (who==="all" || (who==="forme"?forMeFn(i):togetherFn(i))) && (!plat || i.platform===plat) && (!type || i.mediaType===type));
+      const who = chipVal(root,"rwho"), plat = chipVal(root,"rplat"), gen = chipVal(root,"rgen");
+      const wf = { forme:forMeFn, forpartner:forPartnerFn, together:togetherFn }[who];
+      const pool = pool0.filter(i => (!wf || wf(i)) && (!plat || i.platform===plat) && (!gen || (i.genres||[]).includes(gen)));
       const out = root.querySelector("#rollOut");
       if (!pool.length){ out.innerHTML = `<div class="small" style="margin:8px 0 12px">Nada com esses filtros.</div>`; return; }
       let n = 0; const steps = Math.min(14, 6+pool.length);
@@ -941,6 +989,7 @@ $("#nav").addEventListener("click", e=>{
 $("#view").addEventListener("click", e=>{
   const s=e.target.closest("[data-seg]");
   if (s){ if(s.dataset.seg==="year") S.year=+s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
+  const gb=e.target.closest("[data-genre]"); if(gb){ S.genre[S.tab]=gb.dataset.genre; render(); return; }
   const o=e.target.closest("[data-open]"); if(o) return openDetail(o.dataset.open);
   const gd=e.target.closest("[data-goaldel]"); if(gd) return API.del("goals/"+gd.dataset.goaldel).catch(writeErr);
   const id = e.target.closest("button")?.id;
@@ -951,9 +1000,11 @@ $("#view").addEventListener("click", e=>{
   else if (id==="logout") API.signOut();
 });
 $("#fab").onclick = ()=>{
-  if (S.tab==="watched") openWatchForm("done");
-  else if (S.tab==="recs") openWatchForm("todo");
-  else openPlaceForm(S.filter.places);
+  if (S.tab==="movies"||S.tab==="series"){
+    const mt = S.tab==="series" ? "serie" : "filme", f = S.filter[S.tab];
+    if (f==="done") openWatchForm("done", null, mt);
+    else openWatchForm("todo", null, mt, { forme:"self", forpartner:"other", together:"both", watching:"both" }[f]);
+  } else openPlaceForm(S.filter.places);
 };
 
 // ---------- login ----------
