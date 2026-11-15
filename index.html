@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
+<meta name="app-version" content="4">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -211,8 +212,9 @@ nav button.on .i{filter:none;opacity:1}
 
 <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
+<button id="updBar" style="display:none;position:fixed;top:calc(var(--st) + 8px);left:50%;transform:translateX(-50%);z-index:70;background:var(--accent);color:#170d08;font-weight:600;padding:10px 16px;border-radius:99px;box-shadow:0 8px 20px rgba(0,0,0,.4);white-space:nowrap">✨ Nova versão — toque para atualizar</button>
 
-<script src="config.js"></script>
+<script>document.write('<script src="config.js?v='+Date.now()+'"><\/script>')</script>
 <script type="module">
 // =============== constantes ===============
 const PLATFORMS = ["Netflix","Prime Video","Disney+","Max","Apple TV+","Globoplay","Paramount+","YouTube","Cinema","Aluguel/Compra","Outro"];
@@ -1040,6 +1042,20 @@ $("#aForgot").onclick = async ()=>{
   const email=$("#aEmail").value.trim(); if(!email){ $("#aMsg").textContent="Digite seu e-mail acima primeiro."; return; }
   try { await API.reset(email); $("#aMsg").textContent="Enviamos um link pra trocar a senha no seu e-mail."; } catch(_){ $("#aMsg").textContent="Não consegui enviar. Confira o e-mail."; }
 };
+
+// =============== atualização automática ===============
+const MY_VERSION = document.querySelector('meta[name="app-version"]').content;
+async function checkUpdate(){
+  try {
+    const r = await fetch(location.pathname + "?check=" + Date.now(), { cache:"no-store" });
+    const m = (await r.text()).match(/name="app-version" content="([^"]+)"/);
+    if (m && m[1] !== MY_VERSION){
+      const b = $("#updBar"); b.style.display = "block";
+      b.onclick = ()=>location.replace(location.pathname + "?v=" + m[1] + location.hash);
+    }
+  } catch(_){}
+}
+if (!window.__MOCK__){ checkUpdate(); document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) checkUpdate(); }); }
 
 // =============== início ===============
 let unsubs = [];
