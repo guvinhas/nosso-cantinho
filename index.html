@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cantinho">
+<meta name="theme-color" content="#14110f">
+<title>Nosso Cantinho</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
+<link rel="apple-touch-icon" id="touchIcon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#14110f; --bg2:#1d1916; --card:#241f1b; --line:#342d27;
+  --ink:#f4ece4; --mute:#a89a8c; --dim:#6f6358;
+  --accent:#ff7a59; --star:#ffc857;
+  --r:16px;
+  --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
+  --sl:env(safe-area-inset-left,0px); --sr:env(safe-area-inset-right,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;font-size:15px}
+body{min-height:100vh;padding:calc(var(--st) + 8px) calc(var(--sr) + 16px) calc(var(--sb) + 100px) calc(var(--sl) + 16px)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+a{color:inherit}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;outline:none;font-size:16px}
+input[type=date]{min-height:46px;-webkit-appearance:none}
+input:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:76px}
+.wrap{max-width:720px;margin:0 auto}
+header{display:flex;align-items:center;gap:12px;padding:12px 0 4px}
+header .av{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;border:2px solid var(--accent);display:none}
+h1{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:28px;margin:0;letter-spacing:-.5px;line-height:1.05;flex:1}
+h1 small{display:block;font-family:Inter,sans-serif;font-size:12px;font-weight:500;color:var(--mute);letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px}
+.status{font-size:13px;color:var(--mute);padding:10px 12px;background:var(--bg2);border-radius:12px;margin:10px 0;display:none}
+.status.show{display:block}
+.seg{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none;margin:0 -16px;padding-left:16px;padding-right:16px}
+.seg::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:8px 14px;border-radius:99px;background:var(--bg2);border:1px solid var(--line);color:var(--mute);font-size:14px;font-weight:500;white-space:nowrap}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.toolbar{display:flex;gap:8px;margin:8px 0 4px}
+.toolbar input{flex:1}
+.toolbar .btn{width:auto;padding:0 16px;font-size:14px}
+.stats{display:flex;gap:16px;color:var(--mute);font-size:13px;margin:6px 0 12px}
+.stats b{color:var(--ink);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(min-width:560px){.grid{grid-template-columns:repeat(4,1fr)}}
+.poster{position:relative;text-align:left;display:block}
+.cover{aspect-ratio:2/3;border-radius:10px;overflow:hidden;background:var(--card);position:relative;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.cover img{width:100%;height:100%;object-fit:cover;display:block}
+.ph{width:100%;height:100%;display:flex;align-items:flex-end;padding:10px;font-family:Fraunces,serif;font-weight:700;font-size:15px;line-height:1.15;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.4)}
+.poster .t{font-size:13px;font-weight:600;margin-top:6px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.poster .s{font-size:12px;color:var(--star);margin-top:2px}
+.badge{position:absolute;top:6px;left:6px;font-size:10px;font-weight:600;padding:3px 7px;border-radius:99px;background:rgba(0,0,0,.65);color:#fff;letter-spacing:.3px;z-index:1}
+.list{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.row{display:flex;gap:12px;background:var(--card);border-radius:var(--r);padding:12px;text-align:left;width:100%;border:1px solid var(--line)}
+.row .cover{width:72px;flex:none;border-radius:8px}
+.row.place .cover{aspect-ratio:1/1}
+.row .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.row .title{font-weight:600;font-size:16px}
+.meta{font-size:12px;color:var(--mute)}
+.row .note{font-size:13px;color:#d9cdc1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.from{font-size:12px;color:var(--accent)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:99px;background:var(--bg2);border:1px solid var(--line);color:var(--ink);margin-right:4px}
+.tag.acc{background:var(--accent);color:#170d08;border-color:var(--accent)}
+.city{font-family:Fraunces,serif;font-size:18px;margin:18px 0 -4px;display:flex;justify-content:space-between;align-items:baseline}
+.city span{font-family:Inter;font-size:12px;color:var(--mute)}
+.empty{text-align:center;color:var(--mute);padding:48px 16px;line-height:1.5}
+.empty .big{font-size:40px;margin-bottom:8px}
+nav{position:fixed;left:0;right:0;bottom:0;background:rgba(20,17,15,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px calc(var(--sr) + 6px) calc(var(--sb) + 8px) calc(var(--sl) + 6px);display:flex;justify-content:space-around;z-index:10}
+nav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--dim);font-weight:500;padding:4px 6px;min-width:64px}
+nav button .i{font-size:22px;filter:grayscale(1);opacity:.55}
+nav button.on{color:var(--ink)}
+nav button.on .i{filter:none;opacity:1}
+.fab{position:fixed;right:calc(var(--sr) + 18px);bottom:calc(var(--sb) + 82px);width:56px;height:56px;border-radius:50%;background:var(--accent);color:#170d08;font-size:30px;box-shadow:0 10px 24px rgba(0,0,0,.4);z-index:11;display:flex;align-items:center;justify-content:center}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:none;align-items:flex-end;justify-content:center}
+.sheet-bg.show{display:flex}
+.sheet{background:var(--bg2);width:100%;max-width:720px;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:22px 22px 0 0;padding:10px calc(var(--sr) + 18px) calc(var(--sb) + 22px) calc(var(--sl) + 18px);animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 12px}
+.sheet h2{font-family:Fraunces,serif;font-size:22px;margin:0 0 14px}
+.field{margin-bottom:14px}
+.field>label{display:block;font-size:12px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.btn{display:block;width:100%;padding:14px;border-radius:14px;font-weight:600;font-size:16px;text-align:center;text-decoration:none}
+.btn.p{background:var(--accent);color:#170d08}
+.btn.g{background:var(--card);border:1px solid var(--line)}
+.btn.d{color:#ff8a8a}
+.btn.sm{padding:10px 14px;font-size:14px;width:auto;display:inline-block}
+.btn:disabled{opacity:.5}
+.btns{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.btns.h{flex-direction:row}
+.btns.h>*{flex:1}
+.stars{display:flex;gap:4px}
+.stars button{font-size:30px;line-height:1;color:var(--line);padding:2px}
+.stars button.on{color:var(--star)}
+.upl input{display:none}
+.hero{margin:-10px -18px 12px;height:170px;background:#000 center/cover no-repeat;position:relative;border-radius:22px 22px 0 0}
+.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 30%,var(--bg2));border-radius:inherit}
+.detail-top{display:flex;gap:14px;margin-bottom:12px;position:relative;z-index:1}
+.hero+.detail-top{margin-top:-70px}
+.detail-top .cover{width:108px;flex:none}
+.detail-top.sq .cover{aspect-ratio:1/1}
+.detail-top h2{margin:0 0 6px}
+.detail-top .info{padding-top:4px;min-width:0}
+.hero+.detail-top .info{padding-top:70px}
+.overview{font-size:14px;color:#d9cdc1;line-height:1.5}
+.rev{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.rev .who{font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.rev .who span{color:var(--star);font-size:14px}
+.rev p{margin:6px 0 0;font-size:14px;color:#e2d7cc;white-space:pre-wrap}
+.reacts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.reacts button{font-size:16px;padding:4px 9px;border-radius:99px;background:var(--bg2);border:1px solid var(--line);filter:grayscale(.7);opacity:.7}
+.reacts button.on{filter:none;opacity:1;border-color:var(--accent)}
+.got{font-size:13px;margin-top:8px;color:var(--mute)}
+.sec{font-size:12px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 8px}
+.small{font-size:12px;color:var(--mute);line-height:1.5}
+.provs{display:flex;flex-wrap:wrap;gap:8px}
+.prov{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:5px 9px 5px 5px;font-size:12px;font-weight:500}
+.prov img{width:26px;height:26px;border-radius:6px}
+.prov-group{margin-bottom:10px}
+.prov-group .meta{margin-bottom:6px}
+.results{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.res{display:flex;gap:10px;align-items:center;text-align:left;padding:6px;border-radius:12px;background:var(--card);border:1px solid var(--line);width:100%}
+.res img,.res .noimg{width:40px;height:60px;border-radius:6px;object-fit:cover;flex:none;background:var(--line)}
+.res b{display:block;font-size:14px}
+.picked{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:14px}
+.picked .cover{width:80px;flex:none}
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:52vh;overflow-y:auto}
+.pgrid button{border-radius:8px;overflow:hidden;aspect-ratio:2/3;border:2px solid transparent;background:var(--card)}
+.pgrid button.on{border-color:var(--accent)}
+.pgrid img{width:100%;height:100%;object-fit:cover;display:block}
+.stepper{display:flex;align-items:center;gap:10px}
+.stepper button{width:38px;height:38px;border-radius:50%;background:var(--card);border:1px solid var(--line);font-size:20px}
+.stepper b{min-width:28px;text-align:center;font-size:18px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.tile b{display:block;font-family:Fraunces,serif;font-size:26px}
+.tile span{font-size:12px;color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.bar{height:8px;border-radius:9px;background:var(--bg2);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:9px}
+.tl{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.tl .cover{width:36px;flex:none;border-radius:5px}
+.tl .d{font-size:12px;color:var(--mute);min-width:44px}
+.couple{display:flex;flex-direction:column;align-items:center;text-align:center;padding:18px 0 6px}
+.couple img,.couple .noph{width:110px;height:110px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);margin-bottom:10px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:40px}
+.couple h3{font-family:Fraunces,serif;font-size:26px;margin:0}
+.swatches{display:flex;gap:10px}
+.swatches button{width:36px;height:36px;border-radius:50%;border:3px solid transparent}
+.swatches button.on{border-color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:500;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+#auth{display:none;max-width:420px;margin:0 auto;padding-top:8vh}
+#auth .logo{font-size:56px;text-align:center}
+#auth h1{text-align:center;margin:6px 0 4px;font-size:34px}
+#auth p{text-align:center;color:var(--mute);margin:0 0 24px}
+#splash{position:fixed;inset:0;background:var(--bg);z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;transition:opacity .5s}
+#splash.show{display:flex}
+#splash.out{opacity:0}
+#splash img{width:140px;height:140px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);margin-bottom:16px;animation:pop .6s ease-out}
+#splash h2{font-family:Fraunces,serif;font-size:32px;margin:0}
+#splash p{color:var(--mute);margin:6px 0 0}
+@keyframes pop{from{transform:scale(.8);opacity:0}to{transform:none;opacity:1}}
+.roll{font-family:Fraunces,serif;font-size:22px;text-align:center;padding:30px 0;color:var(--mute)}
+.pick-card{text-align:center}
+.pick-card .cover{width:150px;margin:0 auto 12px}
+.pick-card h3{font-family:Fraunces,serif;font-size:24px;margin:0 0 6px}
+.attr{font-size:11px;color:var(--dim);margin-top:6px}
+</style>
+</head>
+<body>
+
+<div id="splash"><img id="splashImg" alt=""><h2 id="splashT"></h2><p id="splashS"></p></div>
+
+<section id="auth">
+  <div class="logo">🍿</div>
+  <h1>Nosso Cantinho</h1>
+  <p>Filmes, séries e lugares de vocês dois</p>
+  <div class="seg" style="justify-content:center;margin:0 0 14px"><button class="chip on" data-am="in">Entrar</button><button class="chip" data-am="up">Criar conta</button></div>
+  <form id="authForm">
+    <div class="field" id="aNameF" style="display:none"><label>Seu nome</label><input id="aName" maxlength="24" autocomplete="nickname"></div>
+    <div class="field"><label>E-mail</label><input id="aEmail" type="email" autocomplete="email" autocapitalize="off"></div>
+    <div class="field"><label>Senha</label><input id="aPass" type="password" autocomplete="current-password" minlength="6"></div>
+    <div class="btns"><button class="btn p" id="aGo" type="submit">Entrar</button><button class="btn g" type="button" id="aForgot">Esqueci a senha</button></div>
+    <p class="small" id="aMsg" style="margin-top:14px"></p>
+  </form>
+</section>
+
+<div class="wrap" id="app" style="display:none">
+  <header>
+    <img class="av" id="hdrAv" alt="">
+    <h1><small id="hello">Nosso cantinho</small><span id="pageTitle">Assistidos</span></h1>
+  </header>
+  <div class="status" id="status"></div>
+  <main id="view"></main>
+</div>
+
+<button class="fab" id="fab" aria-label="Adicionar" style="display:none">+</button>
+
+<nav id="nav" style="display:none">
+  <button data-tab="watched"><span class="i">🎬</span>Assistidos</button>
+  <button data-tab="recs"><span class="i">💌</span>Indicações</button>
+  <button data-tab="places"><span class="i">📍</span>Lugares</button>
+  <button data-tab="us"><span class="i">💛</span>Nós</button>
+</nav>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script type="module">
+// =============== constantes ===============
+const PLATFORMS = ["Netflix","Prime Video","Disney+","Max","Apple TV+","Globoplay","Paramount+","YouTube","Cinema","Outro"];
+const PLACE_CATS = ["Restaurante","Bar","Café","Passeio","Viagem","Parque","Museu","Show/Evento","Outro"];
+const REACTIONS = ["❤️","😂","😭","🔥","👏","🤔"];
+const THEMES = {coral:"#ff7a59", rosa:"#ff5c8a", roxo:"#a77bff", azul:"#4fa3ff", verde:"#3ecf8e", dourado:"#e8b04b"};
+const IMG = "https://image.tmdb.org/t/p/";
+const MESES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const MESES_L = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+const CFG = window.APP_CONFIG || {};
+const S = {
+  tab: ["recs","places","us"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "watched",
+  filter: { watched:"all", recs:"forme", places:"todo" },
+  q: "", year: new Date().getFullYear(),
+  items: [], people: {}, settings: {}, goals: [],
+  me: null, email: "", loaded: false, splashed: false
+};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2000); }
+function setStatus(m){ const s=$("#status"); s.innerHTML=m||""; s.classList.toggle("show",!!m); }
+const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const toISO = ms => { const d=new Date(ms); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const fromISO = s => { if(!s) return Date.now(); const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d,12).getTime(); };
+const fmtDate = ms => { const d=new Date(ms); return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`; };
+const doneAt = it => it.doneAt || it.createdAt || 0;
+
+// =============== camada de dados ===============
+// Usa Firebase de verdade, ou um mock (window.__MOCK__) para testes.
+let API;
+async function initAPI(){
+  if (window.__MOCK__) { API = window.__MOCK__; return; }
+  const v = "10.12.2", base = `https://www.gstatic.com/firebasejs/${v}/`;
+  const [{initializeApp}, A, F] = await Promise.all([
+    import(base+"firebase-app.js"), import(base+"firebase-auth.js"), import(base+"firebase-firestore.js")
+  ]);
+  const app = initializeApp(CFG.firebase);
+  const auth = A.getAuth(app);
+  let db;
+  try { db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+  catch(e){ db = F.getFirestore(app); }
+  API = {
+    onAuth: cb => A.onAuthStateChanged(auth, u => cb(u ? { uid:u.uid, email:u.email } : null)),
+    signIn: (e,p) => A.signInWithEmailAndPassword(auth, e, p),
+    signUp: (e,p) => A.createUserWithEmailAndPassword(auth, e, p),
+    reset: e => A.sendPasswordResetEmail(auth, e),
+    signOut: () => A.signOut(auth),
+    watch: (coll, cb, err) => F.onSnapshot(F.collection(db, coll), s => cb(s.docs.map(d => ({ id:d.id, ...d.data() }))), err),
+    add: (coll, data) => F.addDoc(F.collection(db, coll), data),
+    update: (path, data) => F.updateDoc(F.doc(db, path), data),
+    set: (path, data) => F.setDoc(F.doc(db, path), data, { merge:true }),
+    del: path => F.deleteDoc(F.doc(db, path)),
+    DEL: () => F.deleteField()
+  };
+}
+
+// =============== TMDB ===============
+const TMDB = {
+  ok: () => CFG.tmdbKey && CFG.tmdbKey !== "COLE_AQUI",
+  async get(path, params={}){
+    const key = CFG.tmdbKey, bearer = key.length > 60;
+    const u = new URL("https://api.themoviedb.org/3"+path);
+    Object.entries({ language:"pt-BR", ...params }).forEach(([k,v])=>u.searchParams.set(k,v));
+    if (!bearer) u.searchParams.set("api_key", key);
+    const r = await fetch(u, bearer ? { headers:{ Authorization:"Bearer "+key } } : {});
+    if (!r.ok) throw new Error("tmdb "+r.status);
+    return r.json();
+  },
+  async search(q){
+    const d = await this.get("/search/multi", { query:q, include_adult:"false", region:"BR" });
+    return (d.results||[]).filter(r=>r.media_type==="movie"||r.media_type==="tv").slice(0,8);
+  },
+  _cache: {},
+  async details(type, id){
+    const k = type+id; if (this._cache[k]) return this._cache[k];
+    const d = await this.get(`/${type}/${id}`, { append_to_response:"watch/providers,images", include_image_language:"pt,en,null" });
+    this._cache[k] = d; return d;
+  }
+};
+function provsBR(d){
+  const br = d && d["watch/providers"] && d["watch/providers"].results && d["watch/providers"].results.BR;
+  if (!br) return null;
+  const m = a => (a||[]).sort((x,y)=>(x.display_priority||0)-(y.display_priority||0)).map(p=>({ name:p.provider_name, logo:p.logo_path }));
+  return { link: br.link, stream: m(br.flatrate).concat(m(br.free), m(br.ads)), rent: m(br.rent), buy: m(br.buy) };
+}
+function provsHTML(p){
+  if (!p) return `<div class="small">Não encontramos onde assistir no Brasil agora.</div>`;
+  const g = (t, list) => list.length ? `<div class="prov-group"><div class="meta">${t}</div><div class="provs">${list.map(x=>`<span class="prov">${x.logo?`<img src="${IMG}w92${esc(x.logo)}" alt="">`:""}${esc(x.name)}</span>`).join("")}</div></div>` : "";
+  const h = g("No streaming", p.stream) + g("Alugar", p.rent) + g("Comprar", p.buy);
+  return (h || `<div class="small">Não está disponível em nenhuma plataforma no Brasil agora.</div>`) +
+    (p.link ? `<div class="attr">Dados de disponibilidade: <a href="${esc(p.link)}" target="_blank" rel="noopener">JustWatch</a> via TMDB</div>` : "");
+}
+
+// =============== helpers de UI ===============
+function nameOf(uid){ if(!uid) return "alguém"; if(uid===S.me) return "você"; return (S.people[uid] && S.people[uid].name) || "seu amor"; }
+function nameRaw(uid){ return (S.people[uid] && S.people[uid].name) || (uid===S.me?"Você":"Seu amor"); }
+function other(){ return Object.keys(S.people).find(id => id !== S.me) || null; }
+function hue(str){ let h=0; for(const c of String(str)) h=(h*31+c.charCodeAt(0))%360; return h; }
+function coverSrc(it, size="w342"){
+  if (it.cover && /^data:image\//.test(it.cover)) return it.cover;
+  if (it.poster) return IMG+size+it.poster;
+  return "";
+}
+function coverHTML(it, badge=""){
+  const src = coverSrc(it);
+  if (src) return `<div class="cover">${badge}<img src="${esc(src)}" alt="" loading="lazy"></div>`;
+  const h = hue(it.title||"x");
+  return `<div class="cover">${badge}<div class="ph" style="background:linear-gradient(160deg,hsl(${h},55%,42%),hsl(${(h+40)%360},60%,18%))">${esc(it.title||"")}</div></div>`;
+}
+const starStr = n => { n=Math.round(n||0); return n ? "★".repeat(n)+"☆".repeat(5-n) : ""; };
+const avgRating = it => { const r=Object.values(it.reviews||{}).map(x=>x&&x.rating).filter(Boolean); return r.length ? r.reduce((a,b)=>a+b,0)/r.length : 0; };
+const progTag = it => it.progress && it.progress.s ? `<span class="tag acc">T${it.progress.s} · E${it.progress.e||1}</span>` : "";
+const match = it => { const q=S.q.trim().toLowerCase(); return !q || (it.title||"").toLowerCase().includes(q) || (it.city||"").toLowerCase().includes(q); };
+const segHTML = (opts, cur, key) => `<div class="seg">${opts.map(([k,l])=>`<button class="chip ${cur===k?"on":""}" data-seg="${key}" data-val="${k}">${l}</button>`).join("")}</div>`;
+const emptyHTML = (icon, text) => `<div class="empty"><div class="big">${icon}</div>${text}</div>`;
+const forMeFn = i => i.recFor===S.me;
+const togetherFn = i => i.recFor==="both" || !i.recFor;
+
+function applyTheme(){
+  const c = THEMES[S.settings.theme] || THEMES.coral;
+  document.documentElement.style.setProperty("--accent", c);
+}
+
+// =============== render ===============
+function render(){
+  if (!S.me) return;
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===S.tab));
+  $("#pageTitle").textContent = {watched:"Assistidos", recs:"Indicações", places:"Lugares", us:"Nós dois"}[S.tab];
+  const o = other(), st = S.settings;
+  $("#hello").textContent = st.title || (o ? `${nameRaw(S.me)} & ${nameRaw(o)}` : `Oi, ${nameRaw(S.me)}`);
+  const av = $("#hdrAv"); if (st.photo){ av.src = st.photo; av.style.display="block"; } else av.style.display="none";
+  const v = $("#view");
+  v.innerHTML = S.tab==="watched" ? viewWatched() : S.tab==="recs" ? viewRecs() : S.tab==="places" ? viewPlaces() : viewUs();
+  const si = $("#q"); if (si){ si.value=S.q; si.oninput=e=>{ S.q=e.target.value; const p=e.target.selectionStart; render(); const n=$("#q"); n.focus(); try{n.setSelectionRange(p,p);}catch(_){} }; }
+  $("#fab").style.display = S.tab==="us" ? "none" : "flex";
+}
+
+function viewWatched(){
+  const all = S.items.filter(i=>i.kind==="watch" && i.status==="done");
+  const f = S.filter.watched;
+  const list = all.filter(i => f==="all" || (f==="fav" ? Object.values(i.reviews||{}).some(r=>r&&r.rating>=5) : i.mediaType===f)).filter(match)
+    .sort((a,b)=>doneAt(b)-doneAt(a));
+  const films = all.filter(i=>i.mediaType==="filme").length;
+  let h = segHTML([["all","Tudo"],["filme","Filmes"],["serie","Séries"],["fav","★ 5 estrelas"]], f, "watched");
+  h += `<div class="toolbar"><input id="q" placeholder="Buscar pelo nome…" autocomplete="off"></div>`;
+  h += `<div class="stats"><span><b>${films}</b> filmes</span><span><b>${all.length-films}</b> séries</span></div>`;
+  if (!list.length) return h + emptyHTML("🍿", all.length ? "Nada encontrado com esse filtro." : "Nenhum filme ou série por aqui ainda.<br>Toque no <b>+</b> pra registrar o que vocês já assistiram.");
+  return h + `<div class="grid">${list.map(it=>`
+    <button class="poster" data-open="${esc(it.id)}">
+      ${coverHTML(it, it.mediaType==="serie"?'<span class="badge">SÉRIE</span>':"")}
+      <div class="t">${esc(it.title)}</div>
+      <div class="s">${starStr(avgRating(it))}</div>
+    </button>`).join("")}</div>`;
+}
+
+function recRow(it){
+  const who = it.createdBy===S.me
+    ? (it.recFor==="both"||!it.recFor ? "Você sugeriu pra vocês dois" : `Você indicou pra ${esc(nameOf(it.recFor))}`)
+    : (it.recFor===S.me ? `${esc(nameOf(it.createdBy))} indicou pra você` : `${esc(nameOf(it.createdBy))} sugeriu pra vocês dois`);
+  return `<button class="row" data-open="${esc(it.id)}">
+    ${coverHTML(it)}
+    <div class="body">
+      <div class="title">${esc(it.title)}${it.year?` <span class="meta">${esc(it.year)}</span>`:""}</div>
+      <div>${progTag(it)}<span class="tag">${it.mediaType==="serie"?"Série":"Filme"}</span>${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}</div>
+      <div class="from">${who}</div>
+      ${it.note?`<div class="note">“${esc(it.note)}”</div>`:""}
+    </div></button>`;
+}
+function viewRecs(){
+  const all = S.items.filter(i=>i.kind==="watch" && i.status==="todo");
+  const f = S.filter.recs;
+  const fn = { forme:forMeFn, together:togetherFn, mine:i=>i.createdBy===S.me && i.recFor && i.recFor!=="both", watching:i=>i.progress&&i.progress.s, all:()=>true }[f] || (()=>true);
+  const list = all.filter(fn).filter(match).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const c = fn2 => { const n = all.filter(fn2).length; return n ? ` (${n})` : ""; };
+  let h = segHTML([["forme","Pra mim"+c(forMeFn)],["together","Juntos"+c(togetherFn)],["watching","Assistindo"+c(i=>i.progress&&i.progress.s)],["mine","Que eu indiquei"],["all","Todas"]], f, "recs");
+  h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off"><button class="btn g" id="rollBtn">🎲 Sortear</button></div>`;
+  if (!list.length){
+    const msg = { forme:"Nenhuma indicação pra você ainda.<br>Pede pro seu amor indicar alguma coisa!", together:"Nada na lista de vocês dois ainda.<br>Toque no <b>+</b> e escolha “Nós dois”.", watching:"Nenhuma série em andamento.<br>Abra uma série e marque em que episódio vocês pararam." }[f] || "Toque no <b>+</b> pra indicar um filme ou série.";
+    return h + emptyHTML("💌", msg);
+  }
+  return h + `<div class="list">${list.map(recRow).join("")}</div>`;
+}
+
+function viewPlaces(){
+  const all = S.items.filter(i=>i.kind==="place");
+  const f = S.filter.places;
+  const list = all.filter(i=>i.status===f).filter(match);
+  const todo = all.filter(i=>i.status==="todo").length;
+  let h = segHTML([["todo",`Queremos ir (${todo})`],["done",`Já fomos (${all.length-todo})`]], f, "places");
+  h += `<div class="toolbar"><input id="q" placeholder="Buscar por nome ou cidade…" autocomplete="off"></div>`;
+  if (!list.length) return h + emptyHTML(f==="todo"?"🗺️":"📸", f==="todo" ? "Nenhum lugar na lista ainda.<br>Toque no <b>+</b> pra adicionar um lugar que vocês querem conhecer." : "Ainda nenhum lugar marcado como visitado.");
+  const groups = {};
+  list.forEach(it=>{ const c=(it.city||"").split(/[-,–]/)[0].trim() || "Sem cidade"; (groups[c]=groups[c]||[]).push(it); });
+  const keys = Object.keys(groups).sort((a,b)=> a==="Sem cidade"?1 : b==="Sem cidade"?-1 : groups[b].length-groups[a].length || a.localeCompare(b));
+  return h + keys.map(k=>`<div class="city">${esc(k)}<span>${groups[k].length} ${groups[k].length>1?"lugares":"lugar"}</span></div>
+    <div class="list">${groups[k].sort((a,b)=>doneAt(b)-doneAt(a)).map(it=>`
+      <button class="row place" data-open="${esc(it.id)}">
+        ${coverHTML(it)}
+        <div class="body">
+          <div class="title">${esc(it.title)}</div>
+          <div class="meta">${[it.category, it.city].filter(Boolean).map(esc).join(" · ")}</div>
+          ${f==="done" ? `<div class="meta">${avgRating(it)?`<span style="color:var(--star)">${starStr(avgRating(it))}</span> · `:""}${fmtDate(doneAt(it))}</div>`:""}
+          ${it.note?`<div class="note">${esc(it.note)}</div>`:""}
+        </div></button>`).join("")}</div>`).join("");
+}
+
+function viewUs(){
+  const st = S.settings, Y = S.year;
+  const since = st.since ? Math.floor((Date.now()-fromISO(st.since))/86400000) : null;
+  let h = `<div class="couple">${st.photo?`<img src="${esc(st.photo)}" alt="">`:`<div class="noph">💛</div>`}
+    <h3>${esc(st.title || (other()?`${nameRaw(S.me)} & ${nameRaw(other())}`:"Nós dois"))}</h3>
+    ${since!=null && since>=0 ? `<div class="small" style="margin-top:4px">Juntos há <b style="color:var(--ink)">${since.toLocaleString("pt-BR")}</b> dias</div>`:""}
+  </div>`;
+
+  // retrospectiva
+  const done = S.items.filter(i=>i.status==="done" && new Date(doneAt(i)).getFullYear()===Y);
+  const years = [...new Set(S.items.filter(i=>i.status==="done").map(i=>new Date(doneAt(i)).getFullYear()).concat([new Date().getFullYear()]))].sort((a,b)=>b-a);
+  const films = done.filter(i=>i.kind==="watch"&&i.mediaType==="filme"), series = done.filter(i=>i.kind==="watch"&&i.mediaType==="serie"), places = done.filter(i=>i.kind==="place");
+  const hours = Math.round(films.reduce((a,i)=>a+(i.runtime||0),0)/60);
+  const top = (arr, key) => { const c={}; arr.forEach(i=>[].concat(i[key]||[]).forEach(v=>{ if(v) c[v]=(c[v]||0)+1; })); return Object.entries(c).sort((a,b)=>b[1]-a[1])[0]; };
+  const topPlat = top(films.concat(series), "platform"), topGenre = top(films.concat(series), "genres"), topCat = top(places, "category");
+  const ppl = Object.keys(S.people);
+  const avgOf = uid => { const r = done.filter(i=>i.kind==="watch").map(i=>i.reviews&&i.reviews[uid]&&i.reviews[uid].rating).filter(Boolean); return r.length ? (r.reduce((a,b)=>a+b,0)/r.length).toFixed(1) : "–"; };
+  let dis = null;
+  if (ppl.length>=2) done.forEach(i=>{ const r=i.reviews||{}; const a=r[ppl[0]]&&r[ppl[0]].rating, b=r[ppl[1]]&&r[ppl[1]].rating; if(a&&b){ const d=Math.abs(a-b); if(!dis||d>dis.d) dis={d,i,a,b}; } });
+  let best = null; done.filter(i=>i.kind==="watch").forEach(i=>{ const a=avgRating(i); if(a&&(!best||a>best.a)) best={a,i}; });
+
+  h += `<div class="sec">Retrospectiva</div>${segHTML(years.map(y=>[String(y),String(y)]), String(Y), "year")}
+    <div class="tiles" style="margin-top:10px">
+      <div class="tile"><b>${films.length}</b><span>filmes</span></div>
+      <div class="tile"><b>${series.length}</b><span>séries</span></div>
+      <div class="tile"><b>${places.length}</b><span>lugares</span></div>
+    </div>
+    <div class="card" style="margin-top:10px">
+      ${hours?`<div style="margin-bottom:8px">⏱️ <b>${hours}h</b> de filme juntos</div>`:""}
+      ${topPlat?`<div style="margin-bottom:8px">📺 Plataforma favorita: <b>${esc(topPlat[0])}</b> <span class="meta">(${topPlat[1]})</span></div>`:""}
+      ${topGenre?`<div style="margin-bottom:8px">🎭 Gênero que mais viram: <b>${esc(topGenre[0])}</b></div>`:""}
+      ${topCat?`<div style="margin-bottom:8px">📍 Tipo de lugar favorito: <b>${esc(topCat[0])}</b></div>`:""}
+      ${best?`<div style="margin-bottom:8px">🏆 Melhor nota: <b>${esc(best.i.title)}</b> <span style="color:var(--star)">${starStr(best.a)}</span></div>`:""}
+      ${ppl.length?`<div style="margin-bottom:8px">⭐ Nota média: ${ppl.map(u=>`${esc(nameRaw(u))} <b>${avgOf(u)}</b>`).join(" · ")}</div>`:""}
+      ${dis&&dis.d>=2?`<div>🥊 Onde mais discordaram: <b>${esc(dis.i.title)}</b> <span class="meta">(${esc(nameRaw(ppl[0]))} ${dis.a}★ × ${esc(nameRaw(ppl[1]))} ${dis.b}★)</span></div>`:""}
+      ${!done.length?`<div class="small">Ainda nada marcado em ${Y}.</div>`:""}
+    </div>`;
+
+  // metas
+  const now = new Date();
+  h += `<div class="sec" style="display:flex;justify-content:space-between;align-items:center">Metas <button class="chip" id="goalAdd">+ Nova</button></div>`;
+  if (!S.goals.length) h += `<div class="small">Ex.: “1 lugar novo por mês” ou “10 filmes no ano”.</div>`;
+  S.goals.forEach(g=>{
+    const inPeriod = i => { const d=new Date(doneAt(i)); return d.getFullYear()===now.getFullYear() && (g.period==="ano" || d.getMonth()===now.getMonth()); };
+    const n = S.items.filter(i=>i.status==="done" && (g.kind==="place"?i.kind==="place":i.kind==="watch") && inPeriod(i)).length;
+    const pct = Math.min(100, Math.round(n/(g.target||1)*100));
+    h += `<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(g.text)}</b><button class="small" data-goaldel="${esc(g.id)}">remover</button></div>
+      <div class="small">${n} de ${g.target} ${g.period==="ano"?"neste ano":"neste mês"} ${n>=g.target?"🎉":""}</div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  });
+
+  // linha do tempo
+  const tl = done.slice().sort((a,b)=>doneAt(b)-doneAt(a));
+  if (tl.length){
+    h += `<div class="sec">Linha do tempo de ${Y}</div>`;
+    let lastM = -1;
+    tl.forEach(i=>{
+      const d = new Date(doneAt(i));
+      if (d.getMonth()!==lastM){ lastM=d.getMonth(); h += `<div class="city" style="font-size:16px;margin:14px 0 4px">${MESES_L[lastM]}</div>`; }
+      h += `<button class="tl" data-open="${esc(i.id)}">${coverHTML(i)}<div class="d">${d.getDate()} ${MESES[d.getMonth()]}</div>
+        <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${i.kind==="place"?"📍 ":""}${esc(i.title)}</div>${i.occasion?`<div class="small">${esc(i.occasion)}</div>`:""}</div>
+        <div style="color:var(--star);font-size:12px">${starStr(avgRating(i))}</div></button>`;
+    });
+  }
+
+  h += `<div class="sec">Ajustes</div><div class="btns">
+    <button class="btn g" id="editCouple">💛 Nome, foto, data e cor do casal</button>
+    <button class="btn g" id="editMe">👤 Meu nome (${esc(nameRaw(S.me))})</button>
+    <button class="btn g d" id="logout">Sair da conta</button></div>
+    <p class="small" style="text-align:center;margin-top:18px">Filmes e séries: TMDB · Onde assistir: JustWatch</p>`;
+  return h;
+}
+
+// =============== sheets ===============
+function openSheet(html, onMount){ $("#sheet").innerHTML = `<div class="grab"></div>` + html; $("#sheetBg").classList.add("show"); $("#sheet").scrollTop=0; onMount && onMount($("#sheet")); }
+function closeSheet(){ $("#sheetBg").classList.remove("show"); }
+$("#sheetBg").addEventListener("click", e=>{ if(e.target.id==="sheetBg" && !S.mustName) closeSheet(); });
+
+const starsInput = (name, v) => `<div class="stars" data-stars="${name}" data-val="${v||0}">${[1,2,3,4,5].map(n=>`<button type="button" data-n="${n}" class="${n<=(v||0)?"on":""}">★</button>`).join("")}</div>`;
+function wireStars(root){
+  root.querySelectorAll("[data-stars]").forEach(box=>box.addEventListener("click", e=>{
+    const b=e.target.closest("button"); if(!b) return;
+    let n=+b.dataset.n; if(+box.dataset.val===n) n=0;
+    box.dataset.val=n; box.querySelectorAll("button").forEach(x=>x.classList.toggle("on", +x.dataset.n<=n));
+  }));
+}
+const chipsInput = (name, opts, cur) => `<div class="chips" data-chips="${name}" data-val="${esc(cur||"")}">${opts.map(o=>{ const [v,l] = Array.isArray(o)?o:[o,o]; return `<button type="button" class="chip ${v===cur?"on":""}" data-v="${esc(v)}">${esc(l)}</button>`; }).join("")}</div>`;
+function wireChips(root, noToggleOff){
+  root.querySelectorAll("[data-chips]").forEach(box=>box.addEventListener("click", e=>{
+    const b=e.target.closest("button"); if(!b) return;
+    const v = box.dataset.val===b.dataset.v && !box.hasAttribute("data-req") ? "" : b.dataset.v;
+    box.dataset.val=v; box.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.v===v));
+    box.dispatchEvent(new Event("change"));
+  }));
+}
+const chipVal = (root, name) => root.querySelector(`[data-chips="${name}"]`)?.dataset.val || "";
+const val = (root, sel) => (root.querySelector(sel)?.value || "").trim();
+
+function shrink(file, square, W=360){
+  return new Promise((res, rej)=>{
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = ()=>{
+      const H = square ? W : Math.round(W*1.5);
+      const c = document.createElement("canvas"); c.width=W; c.height=H;
+      const x = c.getContext("2d"); const s = Math.max(W/img.width, H/img.height);
+      x.drawImage(img, (W-img.width*s)/2, (H-img.height*s)/2, img.width*s, img.height*s);
+      URL.revokeObjectURL(url);
+      let q=.8, out=c.toDataURL("image/jpeg", q);
+      while (out.length > 180000 && q > .4){ q-=.1; out=c.toDataURL("image/jpeg", q); }
+      res(out);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); rej(); };
+    img.src = url;
+  });
+}
+
+// ---------- formulário de filme/série com busca TMDB ----------
+function openWatchForm(status, it){
+  const editing = !!it; it = it || {};
+  const st = { tmdb: it.tmdbId ? { id:it.tmdbId, type:it.tmdbType } : null, poster: it.poster||"", cover: it.cover||"", backdrop: it.backdrop||"",
+    title: it.title||"", year: it.year||"", mediaType: it.mediaType||"filme", overview: it.overview||"", genres: it.genres||[], runtime: it.runtime||0, seasons: it.seasons||0, providers: null };
+  const o = other(), isRec = status==="todo";
+  const html = `<h2>${editing?"Editar":isRec?"Nova indicação":"Já assistimos"}</h2>
+    <div id="searchBox" ${editing?'style="display:none"':""}>
+      <div class="field"><input id="tq" placeholder="🔎 Buscar filme ou série…" autocomplete="off" autocapitalize="off"></div>
+      <div class="results" id="tres"></div>
+      <p class="small" style="margin-top:10px">${TMDB.ok()?"":"⚠️ Chave do TMDB não configurada — a busca automática está desligada. "}Não achou? <button type="button" id="manual" style="text-decoration:underline;color:var(--ink)">Preencher na mão</button></p>
+    </div>
+    <div id="formBox" ${editing?"":'style="display:none"'}>
+      <div class="picked" id="picked"></div>
+      <div class="field" id="manualFields"></div>
+      <div class="field"><label>Onde assistir</label><div id="provBox"></div>${chipsInput("fplat", PLATFORMS, it.platform)}</div>
+      ${isRec ? `
+        <div class="field"><label>Pra quem</label>${chipsInput("ffor", o ? [[o, nameRaw(o)],["both","Nós dois"]] : [["both","Nós dois"]], editing ? (it.recFor==="both"||!it.recFor?"both":it.recFor) : (o||"both"))}</div>
+        <div class="field"><label>${editing?"Por que assistir?":"Por que você indica?"}</label><textarea id="fNote" placeholder="Conta por que…">${esc(it.note)}</textarea></div>
+      ` : editing ? `
+        <div class="field"><label>Quando assistiram</label><input type="date" id="fDate" value="${toISO(doneAt(it))}" max="${today()}"></div>
+        <div class="field"><label>Ocasião / onde</label><input id="fOcc" placeholder="Ex: no cinema, no nosso aniversário" value="${esc(it.occasion)}"></div>
+      ` : `
+        <div class="field"><label>Quando assistiram</label><input type="date" id="fDate" value="${today()}" max="${today()}"></div>
+        <div class="field"><label>Ocasião / onde</label><input id="fOcc" placeholder="Ex: no cinema, no nosso aniversário"></div>
+        <div class="field"><label>Sua nota</label>${starsInput("frate",0)}</div>
+        <div class="field"><label>Seu comentário</label><textarea id="fRev" placeholder="O que você achou?"></textarea></div>`}
+      <div class="btns"><button class="btn p" id="fSave">${editing?"Salvar":isRec?"Enviar indicação 💌":"Adicionar"}</button><button class="btn g" id="fCancel">Cancelar</button></div>
+    </div>`;
+  openSheet(html, root=>{
+    wireChips(root); wireStars(root);
+    root.querySelector('[data-chips="ffor"]')?.setAttribute("data-req","");
+    root.querySelector("#fCancel").onclick = ()=> editing ? openDetail(it.id) : closeSheet();
+
+    const drawPicked = ()=>{
+      const meta = [st.mediaType==="serie"?"Série":"Filme", st.year, st.seasons?`${st.seasons} temporada${st.seasons>1?"s":""}`:"", st.runtime?`${st.runtime} min`:""].filter(Boolean).join(" · ");
+      root.querySelector("#picked").innerHTML = `${coverHTML({ title: st.title||"Capa", poster: st.poster, cover: st.cover })}
+        <div style="flex:1;min-width:0">
+          <b style="font-size:16px">${esc(st.title||"Sem nome")}</b><div class="meta" style="margin:2px 0 8px">${esc(meta)}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${st.tmdb?`<button type="button" class="chip" id="pickPoster">🖼️ Outras capas</button>`:""}
+            <label class="chip upl" style="cursor:pointer">📷 Minha foto<input type="file" accept="image/*" id="upFile"></label>
+            ${!editing?`<button type="button" class="chip" id="reSearch">↺ Trocar</button>`:""}
+          </div></div>`;
+      root.querySelector("#pickPoster") && (root.querySelector("#pickPoster").onclick = ()=>openPosterPicker(st, drawPicked));
+      root.querySelector("#reSearch") && (root.querySelector("#reSearch").onclick = ()=>{ root.querySelector("#formBox").style.display="none"; root.querySelector("#searchBox").style.display="block"; root.querySelector("#tq").focus(); });
+      const f = root.querySelector("#upFile");
+      f.onchange = async ()=>{ const file=f.files[0]; if(!file) return; try{ st.cover = await shrink(file,false); drawPicked(); }catch(_){ toast("Não consegui ler essa imagem"); } };
+    };
+    const drawManual = show => {
+      root.querySelector("#manualFields").innerHTML = show ? `<label>Nome</label><input id="fTitle" value="${esc(st.title)}" placeholder="Nome do filme ou série">
+        <div style="margin-top:10px">${chipsInput("ftype", [["filme","Filme"],["serie","Série"]], st.mediaType)}</div>` : "";
+      if (show){ wireChips(root.querySelector("#manualFields")); root.querySelector('[data-chips="ftype"]').setAttribute("data-req","");
+        root.querySelector("#fTitle").oninput = e=>{ st.title=e.target.value; };
+        root.querySelector('[data-chips="ftype"]').addEventListener("change", e=>{ st.mediaType=e.currentTarget.dataset.val; drawPicked(); });
+      }
+    };
+    const setPlat = name => { const box = root.querySelector('[data-chips="fplat"]'); box.dataset.val=name; box.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.v===name)); };
+
+    async function choose(r){
+      st.tmdb = { id:r.id, type:r.media_type }; st.title = r.title||r.name; st.year = (r.release_date||r.first_air_date||"").slice(0,4);
+      st.mediaType = r.media_type==="tv"?"serie":"filme"; st.poster = r.poster_path||""; st.backdrop = r.backdrop_path||""; st.overview = r.overview||""; st.cover="";
+      root.querySelector("#searchBox").style.display="none"; root.querySelector("#formBox").style.display="block";
+      drawManual(false); drawPicked();
+      root.querySelector("#provBox").innerHTML = `<div class="small" style="margin-bottom:8px">Buscando onde assistir…</div>`;
+      try {
+        const d = await TMDB.details(r.media_type, r.id);
+        st.genres = (d.genres||[]).map(g=>g.name).slice(0,3); st.runtime = d.runtime||0; st.seasons = d.number_of_seasons||0;
+        st.overview = d.overview || st.overview;
+        const p = provsBR(d); st.providers = p;
+        root.querySelector("#provBox").innerHTML = `<div style="margin-bottom:10px">${provsHTML(p)}</div><div class="small" style="margin-bottom:6px">Plataforma principal:</div>`;
+        const first = p && p.stream[0] && matchPlatform(p.stream[0].name);
+        if (first) setPlat(first); else if (p && (p.rent.length||p.buy.length)) setPlat("Outro");
+        drawPicked();
+      } catch(e){ root.querySelector("#provBox").innerHTML = ""; }
+    }
+
+    if (editing){ drawPicked(); drawManual(!st.tmdb); }
+    else {
+      root.querySelector("#manual").onclick = ()=>{ st.tmdb=null; st.title=val(root,"#tq"); root.querySelector("#searchBox").style.display="none"; root.querySelector("#formBox").style.display="block"; root.querySelector("#provBox").innerHTML=""; drawManual(true); drawPicked(); root.querySelector("#fTitle").focus(); };
+      const tq = root.querySelector("#tq"), tres = root.querySelector("#tres"); let tmr, seq=0;
+      setTimeout(()=>tq.focus(), 300);
+      tq.oninput = ()=>{
+        clearTimeout(tmr); const q = tq.value.trim();
+        if (q.length<2 || !TMDB.ok()){ tres.innerHTML=""; return; }
+        tmr = setTimeout(async ()=>{
+          const my = ++seq; tres.innerHTML = `<div class="small">Buscando…</div>`;
+          try {
+            const rs = await TMDB.search(q); if (my!==seq) return;
+            tres.innerHTML = rs.length ? rs.map((r,i)=>`<button type="button" class="res" data-i="${i}">
+              ${r.poster_path?`<img src="${IMG}w92${esc(r.poster_path)}" alt="">`:`<span class="noimg"></span>`}
+              <span style="min-width:0"><b>${esc(r.title||r.name)}</b><span class="meta">${r.media_type==="tv"?"Série":"Filme"}${(r.release_date||r.first_air_date)?" · "+esc((r.release_date||r.first_air_date).slice(0,4)):""}</span></span></button>`).join("")
+              : `<div class="small">Nada encontrado. Tente outro nome ou preencha na mão.</div>`;
+            tres.querySelectorAll(".res").forEach(b=>b.onclick=()=>choose(rs[+b.dataset.i]));
+          } catch(e){ if (my===seq) tres.innerHTML = `<div class="small">Não consegui buscar agora (${esc(e.message)}). Confira a chave do TMDB no config.js.</div>`; }
+        }, 300);
+      };
+    }
+
+    root.querySelector("#fSave").onclick = async e=>{
+      if (!st.title.trim()){ toast("Coloca um nome 🙂"); return; }
+      const data = { title: st.title.trim(), mediaType: st.mediaType, year: st.year, poster: st.poster, cover: st.cover, backdrop: st.backdrop,
+        overview: st.overview, genres: st.genres, runtime: st.runtime, seasons: st.seasons,
+        tmdbId: st.tmdb ? st.tmdb.id : null, tmdbType: st.tmdb ? st.tmdb.type : null, platform: chipVal(root,"fplat") };
+      if (isRec){ data.recFor = chipVal(root,"ffor") || "both"; data.note = val(root,"#fNote"); }
+      if (root.querySelector("#fDate")){ data.doneAt = fromISO(val(root,"#fDate")); data.occasion = val(root,"#fOcc"); }
+      e.target.disabled = true;
+      try {
+        if (editing){ await API.update("items/"+it.id, data); toast("Salvo ✓"); openDetail(it.id); return; }
+        Object.assign(data, { kind:"watch", status, createdBy:S.me, createdAt:Date.now(), reviews:{} });
+        const rate = +(root.querySelector('[data-stars="frate"]')?.dataset.val||0), rev = val(root,"#fRev");
+        if (!isRec && (rate||rev)) data.reviews[S.me] = { rating:rate, text:rev, at:Date.now() };
+        await API.add("items", data);
+        toast(isRec ? "Indicação enviada 💌" : "Adicionado ✓"); closeSheet();
+      } catch(err){ e.target.disabled=false; writeErr(err); }
+    };
+  });
+}
+function matchPlatform(name){
+  const n = name.toLowerCase();
+  if (n.includes("netflix")) return "Netflix";
+  if (n.includes("amazon") || n.includes("prime")) return "Prime Video";
+  if (n.includes("disney")) return "Disney+";
+  if (n==="max" || n.includes("hbo") || n.startsWith("max ")) return "Max";
+  if (n.includes("apple")) return "Apple TV+";
+  if (n.includes("globo")) return "Globoplay";
+  if (n.includes("paramount")) return "Paramount+";
+  if (n.includes("youtube")) return "YouTube";
+  return "Outro";
+}
+
+function openPosterPicker(st, done){
+  const ov = document.createElement("div");
+  ov.className = "sheet-bg show"; ov.style.zIndex = 30;
+  ov.innerHTML = `<div class="sheet"><div class="grab"></div><h2>Escolha a capa</h2><div class="pgrid" id="pg"><div class="small">Carregando capas…</div></div>
+    <div class="btns"><button class="btn g" id="pgClose">Fechar</button></div></div>`;
+  document.body.appendChild(ov);
+  const close = ()=>ov.remove();
+  ov.querySelector("#pgClose").onclick = close;
+  ov.addEventListener("click", e=>{ if(e.target===ov) close(); });
+  TMDB.details(st.tmdb.type, st.tmdb.id).then(d=>{
+    const ps = ((d.images&&d.images.posters)||[]).slice(0,40);
+    if (d.poster_path && !ps.find(p=>p.file_path===d.poster_path)) ps.unshift({ file_path:d.poster_path });
+    const pg = ov.querySelector("#pg");
+    pg.innerHTML = ps.length ? ps.map(p=>`<button data-p="${esc(p.file_path)}" class="${p.file_path===st.poster&&!st.cover?"on":""}"><img src="${IMG}w185${esc(p.file_path)}" loading="lazy" alt=""></button>`).join("") : `<div class="small">Sem outras capas para este título.</div>`;
+    pg.querySelectorAll("button").forEach(b=>b.onclick=()=>{ st.poster=b.dataset.p; st.cover=""; done(); close(); });
+  }).catch(()=>{ ov.querySelector("#pg").innerHTML = `<div class="small">Não consegui carregar as capas.</div>`; });
+}
+
+// ---------- formulário de lugar ----------
+function openPlaceForm(status, it){
+  const editing = !!it; it = it || {};
+  const st = { cover: it.cover||"" };
+  const done = status==="done";
+  openSheet(`<h2>${editing?"Editar lugar":done?"Lugar que fomos":"Lugar pra ir"}</h2>
+    <div class="field"><label>Nome do lugar</label><input id="fTitle" placeholder="Ex: Pizzaria do Zé, Chapada Diamantina" value="${esc(it.title)}"></div>
+    <div class="field"><label>Cidade</label><input id="fCity" placeholder="Ex: São Paulo" value="${esc(it.city)}"></div>
+    <div class="field"><label>Endereço (opcional)</label><input id="fAddr" placeholder="Rua, bairro…" value="${esc(it.address)}"></div>
+    <div class="field"><label>Categoria</label>${chipsInput("fcat", PLACE_CATS, it.category)}</div>
+    <div class="field"><label>Foto</label><div style="display:flex;gap:12px;align-items:center"><span id="upPrev" style="width:76px">${coverHTML({title:it.title||"Foto",cover:st.cover})}</span>
+      <label class="btn g sm upl" style="cursor:pointer">📷 ${st.cover?"Trocar":"Adicionar"} foto<input type="file" accept="image/*" id="upFile"></label></div></div>
+    ${done ? `<div class="field"><label>Quando foram</label><input type="date" id="fDate" value="${toISO(editing?doneAt(it):Date.now())}" max="${today()}"></div>
+      <div class="field"><label>Ocasião</label><input id="fOcc" placeholder="Ex: viagem de férias, 1 ano de namoro" value="${esc(it.occasion)}"></div>`:""}
+    <div class="field"><label>${done?"Notas e dicas":"Por que ir? / Dicas"}</label><textarea id="fNote" placeholder="${done?"Ex: pedir o risoto, ir cedo…":"Ex: vi no Instagram, tem vista pro mar…"}">${esc(it.note)}</textarea></div>
+    ${done && !editing ? `<div class="field"><label>Sua nota</label>${starsInput("frate",0)}</div><div class="field"><label>Seu comentário</label><textarea id="fRev" placeholder="Como foi?"></textarea></div>`:""}
+    <div class="btns"><button class="btn p" id="fSave">${editing?"Salvar":"Adicionar"}</button><button class="btn g" id="fCancel">Cancelar</button></div>`, root=>{
+    wireChips(root); wireStars(root);
+    root.querySelector("#upPrev .cover").style.aspectRatio = "1/1";
+    root.querySelector("#fCancel").onclick = ()=> editing ? openDetail(it.id) : closeSheet();
+    const f = root.querySelector("#upFile");
+    f.onchange = async ()=>{ const file=f.files[0]; if(!file) return; try{ st.cover=await shrink(file,true,480); root.querySelector("#upPrev").innerHTML = coverHTML({cover:st.cover}); root.querySelector("#upPrev .cover").style.aspectRatio="1/1"; }catch(_){ toast("Não consegui ler essa imagem"); } };
+    root.querySelector("#fSave").onclick = async e=>{
+      const title = val(root,"#fTitle"); if(!title){ toast("Coloca um nome 🙂"); return; }
+      const data = { title, city: val(root,"#fCity"), address: val(root,"#fAddr"), category: chipVal(root,"fcat"), note: val(root,"#fNote"), cover: st.cover };
+      if (done){ data.doneAt = fromISO(val(root,"#fDate")); data.occasion = val(root,"#fOcc"); }
+      e.target.disabled = true;
+      try {
+        if (editing){ await API.update("items/"+it.id, data); toast("Salvo ✓"); openDetail(it.id); return; }
+        Object.assign(data, { kind:"place", status, createdBy:S.me, createdAt:Date.now(), reviews:{} });
+        const rate = +(root.querySelector('[data-stars="frate"]')?.dataset.val||0), rev = val(root,"#fRev");
+        if (done && (rate||rev)) data.reviews[S.me] = { rating:rate, text:rev, at:Date.now() };
+        await API.add("items", data); toast("Adicionado ✓"); closeSheet();
+      } catch(err){ e.target.disabled=false; writeErr(err); }
+    };
+  });
+}
+
+// ---------- detalhe ----------
+function openDetail(id){
+  const it = S.items.find(i=>i.id===id); if(!it) return closeSheet();
+  const isPlace = it.kind==="place", done = it.status==="done", revs = it.reviews || {};
+  let html = "";
+  if (it.backdrop) html += `<div class="hero" style="background-image:url('${IMG}w780${esc(it.backdrop)}')"></div>`;
+  const metaBits = isPlace ? [it.category, it.city] : [it.mediaType==="serie"?"Série":"Filme", it.year, it.seasons?`${it.seasons} temp.`:"", it.runtime?`${it.runtime} min`:"", (it.genres||[]).join(", ")];
+  html += `<div class="detail-top ${isPlace?"sq":""}">${coverHTML(it)}<div class="info">
+      <h2>${esc(it.title)}</h2>
+      <div class="meta">${metaBits.filter(Boolean).map(esc).join(" · ")}</div>
+      <div style="margin-top:8px">${progTag(it)}${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}</div>
+      ${avgRating(it)?`<div style="color:var(--star);margin-top:8px">${starStr(avgRating(it))}</div>`:""}
+      <div class="small" style="margin-top:6px">${done ? `${isPlace?"Fomos":"Assistimos"} em ${fmtDate(doneAt(it))}${it.occasion?` · ${esc(it.occasion)}`:""}` :
+        (!isPlace ? (it.createdBy===S.me ? (it.recFor&&it.recFor!=="both"?`Você indicou pra ${esc(nameOf(it.recFor))}`:"Você sugeriu pra vocês dois") : `${esc(nameOf(it.createdBy))} ${it.recFor===S.me?"indicou pra você":"sugeriu pra vocês dois"}`) : `Adicionado por ${esc(nameOf(it.createdBy))}`)}</div>
+    </div></div>`;
+  if (it.note) html += `<div class="sec">${isPlace?"Notas":done?"Por que foi indicado":"Por que assistir"}</div><div class="rev"><p style="margin:0">${esc(it.note)}</p></div>`;
+  if (it.overview) html += `<div class="sec">Sinopse</div><div class="overview">${esc(it.overview)}</div>`;
+  if (!isPlace && it.tmdbId) html += `<div class="sec">Onde assistir no Brasil</div><div id="liveProv"><div class="small">Buscando…</div></div>`;
+  if (isPlace){
+    const q = encodeURIComponent([it.title, it.address, it.city].filter(Boolean).join(", "));
+    html += `<div class="sec">Mapa</div><div class="btns h"><a class="btn g" href="https://maps.apple.com/?q=${q}" target="_blank" rel="noopener">🗺️ Apple Maps</a><a class="btn g" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">📍 Google Maps</a></div>`;
+  }
+  if (!done && it.mediaType==="serie"){
+    const p = it.progress || { s:0, e:0 };
+    html += `<div class="sec">Onde vocês pararam</div><div class="card" style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:12px">
+      <div><div class="small" style="text-align:center;margin-bottom:6px">Temporada${it.seasons?` (de ${it.seasons})`:""}</div><div class="stepper"><button data-step="s" data-d="-1">−</button><b id="ps">${p.s||"–"}</b><button data-step="s" data-d="1">+</button></div></div>
+      <div><div class="small" style="text-align:center;margin-bottom:6px">Episódio</div><div class="stepper"><button data-step="e" data-d="-1">−</button><b id="pe">${p.e||"–"}</b><button data-step="e" data-d="1">+</button></div></div></div>`;
+  }
+  if (done){
+    html += `<div class="sec">Comentários</div>`;
+    const mine = revs[S.me];
+    const reactsOn = r => Object.entries((r&&r.reactions)||{});
+    html += `<div class="rev" style="border-color:color-mix(in srgb,var(--accent) 40%,var(--line))"><div class="who">Você ${mine&&mine.rating?`<span>${starStr(mine.rating)}</span>`:""}</div>
+      ${mine&&mine.text?`<p>${esc(mine.text)}</p>`:""}
+      ${reactsOn(mine).length?`<div class="got">${reactsOn(mine).map(([u,e])=>`${e} de ${esc(nameRaw(u))}`).join(" · ")}</div>`:""}
+      <button class="small" id="dRev" style="margin-top:8px;text-decoration:underline">${mine?"Editar meu comentário":"Escrever meu comentário"}</button></div>`;
+    Object.keys(revs).filter(u=>u!==S.me).forEach(uid=>{
+      const r = revs[uid]; if(!r) return;
+      const my = r.reactions && r.reactions[S.me];
+      html += `<div class="rev"><div class="who">${esc(nameRaw(uid))} ${r.rating?`<span>${starStr(r.rating)}</span>`:""}</div>${r.text?`<p>${esc(r.text)}</p>`:""}
+        <div class="reacts">${REACTIONS.map(e=>`<button data-react="${uid}" data-e="${e}" class="${my===e?"on":""}">${e}</button>`).join("")}</div></div>`;
+    });
+    const o = other();
+    if (o && !revs[o]) html += `<div class="small">${esc(nameRaw(o))} ainda não comentou.</div>`;
+  }
+  html += `<div class="btns" style="margin-top:18px">`;
+  if (!done) html += `<button class="btn p" id="dDone">${isPlace?"📍 Fomos!":"✓ Assistimos"}</button>`;
+  html += `<div class="btns h"><button class="btn g" id="dEdit">Editar</button><button class="btn g d" id="dDel">Apagar</button></div></div>`;
+
+  openSheet(html, root=>{
+    root.querySelector("#dRev") && (root.querySelector("#dRev").onclick = ()=>openReview(it, false));
+    root.querySelector("#dDone") && (root.querySelector("#dDone").onclick = ()=>openReview(it, true));
+    root.querySelector("#dEdit").onclick = ()=> isPlace ? openPlaceForm(it.status, it) : openWatchForm(it.status, it);
+    root.querySelector("#dDel").onclick = ()=>confirmDelete(it);
+    root.querySelectorAll("[data-react]").forEach(b=>b.onclick = async ()=>{
+      const r = it.reviews[b.dataset.react]; r.reactions = { ...(r.reactions||{}) };
+      const cur = r.reactions[S.me];
+      if (cur===b.dataset.e) delete r.reactions[S.me]; else r.reactions[S.me] = b.dataset.e;
+      const v = cur===b.dataset.e ? API.DEL() : b.dataset.e;
+      root.querySelectorAll(`[data-react="${b.dataset.react}"]`).forEach(x=>x.classList.toggle("on", x===b && cur!==b.dataset.e));
+      try { await API.update("items/"+it.id, { [`reviews.${b.dataset.react}.reactions.${S.me}`]: v }); } catch(err){ writeErr(err); }
+    });
+    // progresso da série
+    let p = { ...(it.progress||{ s:0, e:0 }) }, pt;
+    root.querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{
+      const k=b.dataset.step, d=+b.dataset.d;
+      if (k==="s"){ p.s=Math.max(0,(p.s||0)+d); if(it.seasons) p.s=Math.min(p.s,it.seasons); p.e = p.s ? 1 : 0; }
+      else { if(!p.s) p.s=1; p.e=Math.max(1,(p.e||0)+d); }
+      root.querySelector("#ps").textContent = p.s||"–"; root.querySelector("#pe").textContent = p.e||"–";
+      clearTimeout(pt); pt=setTimeout(()=>API.update("items/"+it.id, { progress: p.s ? p : API.DEL() }).catch(writeErr), 700);
+    });
+    // onde assistir ao vivo
+    const lp = root.querySelector("#liveProv");
+    if (lp){
+      if (!TMDB.ok()) lp.innerHTML = `<div class="small">Configure a chave do TMDB para ver.</div>`;
+      else TMDB.details(it.tmdbType, it.tmdbId).then(d=>{ lp.innerHTML = provsHTML(provsBR(d)); }).catch(()=>{ lp.innerHTML = `<div class="small">Não consegui buscar agora.</div>`; });
+    }
+  });
+}
+
+function openReview(it, markDone){
+  const r = (it.reviews||{})[S.me] || {}, isPlace = it.kind==="place";
+  openSheet(`<h2>${markDone ? (isPlace?"Como foi?":"O que você achou?") : "Meu comentário"}</h2>
+    <p class="small" style="margin-top:-8px">${esc(it.title)}</p>
+    ${markDone?`<div class="field"><label>Quando</label><input type="date" id="rDate" value="${today()}" max="${today()}"></div>
+      <div class="field"><label>Ocasião / onde</label><input id="rOcc" placeholder="${isPlace?"Ex: viagem de férias":"Ex: no cinema, em casa com pipoca"}"></div>`:""}
+    <div class="field"><label>Sua nota</label>${starsInput("rrate", r.rating)}</div>
+    <div class="field"><label>Comentário</label><textarea id="rText" placeholder="Escreva o que quiser…">${esc(r.text)}</textarea></div>
+    <div class="btns"><button class="btn p" id="rSave">${markDone?(isPlace?"Marcar como visitado":"Marcar como assistido"):"Salvar"}</button>
+    <button class="btn g" id="rCancel">Cancelar</button></div>`, root=>{
+    wireStars(root);
+    root.querySelector("#rCancel").onclick = ()=>openDetail(it.id);
+    root.querySelector("#rSave").onclick = async e=>{
+      const rating = +root.querySelector('[data-stars="rrate"]').dataset.val || 0, text = val(root,"#rText");
+      const patch = {};
+      if (rating || text || r.rating || r.text){ patch[`reviews.${S.me}.rating`] = rating; patch[`reviews.${S.me}.text`] = text; patch[`reviews.${S.me}.at`] = Date.now(); }
+      if (markDone){ patch.status="done"; patch.doneAt=fromISO(val(root,"#rDate")); patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
+      if (!Object.keys(patch).length) return openDetail(it.id);
+      e.target.disabled = true;
+      try { await API.update("items/"+it.id, patch); toast(markDone ? (isPlace?"Marcado como visitado 📍":"Foi pra Assistidos 🎬") : "Salvo ✓"); markDone ? closeSheet() : openDetail(it.id); }
+      catch(err){ e.target.disabled=false; writeErr(err); }
+    };
+  });
+}
+
+function confirmDelete(it){
+  openSheet(`<h2>Apagar “${esc(it.title)}”?</h2><p class="small">Some pra vocês dois. Não dá pra desfazer.</p>
+    <div class="btns"><button class="btn p" id="xYes" style="background:#ff6b6b">Apagar</button><button class="btn g" id="xNo">Cancelar</button></div>`, root=>{
+    root.querySelector("#xNo").onclick = ()=>openDetail(it.id);
+    root.querySelector("#xYes").onclick = async e=>{ e.target.disabled=true; try{ await API.del("items/"+it.id); toast("Apagado"); closeSheet(); }catch(err){ e.target.disabled=false; writeErr(err); } };
+  });
+}
+
+// ---------- sorteio ----------
+function openRoll(){
+  const pool0 = S.items.filter(i=>i.kind==="watch" && i.status==="todo");
+  if (!pool0.length) return toast("Não tem indicação pra sortear ainda");
+  const plats = [...new Set(pool0.map(i=>i.platform).filter(Boolean))];
+  openSheet(`<h2>🎲 O que assistir hoje?</h2>
+    <div class="field"><label>De qual lista</label>${chipsInput("rwho", [["all","Todas"],["forme","Pra mim"],["together","Juntos"]], "all")}</div>
+    ${plats.length?`<div class="field"><label>Plataforma</label>${chipsInput("rplat", [["","Qualquer"], ...plats.map(p=>[p,p])], "")}</div>`:""}
+    <div class="field"><label>Tipo</label>${chipsInput("rtype", [["","Tanto faz"],["filme","Filme"],["serie","Série"]], "")}</div>
+    <div id="rollOut"></div>
+    <div class="btns"><button class="btn p" id="rollGo">Sortear</button><button class="btn g" id="rollX">Fechar</button></div>`, root=>{
+    wireChips(root); root.querySelectorAll("[data-chips]").forEach(b=>b.setAttribute("data-req",""));
+    root.querySelector("#rollX").onclick = closeSheet;
+    root.querySelector("#rollGo").onclick = ()=>{
+      const who = chipVal(root,"rwho"), plat = chipVal(root,"rplat"), type = chipVal(root,"rtype");
+      const pool = pool0.filter(i => (who==="all" || (who==="forme"?forMeFn(i):togetherFn(i))) && (!plat || i.platform===plat) && (!type || i.mediaType===type));
+      const out = root.querySelector("#rollOut");
+      if (!pool.length){ out.innerHTML = `<div class="small" style="margin:8px 0 12px">Nada com esses filtros.</div>`; return; }
+      let n = 0; const steps = Math.min(14, 6+pool.length);
+      const tick = ()=>{
+        const it = pool[Math.floor(Math.random()*pool.length)];
+        if (n++ < steps){ out.innerHTML = `<div class="roll">${esc(it.title)}</div>`; setTimeout(tick, 60+n*12); return; }
+        out.innerHTML = `<div class="pick-card">${coverHTML(it)}<h3>${esc(it.title)}</h3><div>${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}${progTag(it)}</div>
+          ${it.note?`<p class="small">“${esc(it.note)}”</p>`:""}<button class="btn g sm" id="rollOpen" style="margin:10px 0 6px">Ver detalhes</button></div>`;
+        root.querySelector("#rollGo").textContent = "Sortear de novo";
+        root.querySelector("#rollOpen").onclick = ()=>openDetail(it.id);
+      };
+      tick();
+    };
+  });
+}
+
+// ---------- ajustes ----------
+function openName(force){
+  S.mustName = force;
+  openSheet(`<h2>${force?"Oi! Como você se chama?":"Seu nome"}</h2>
+    <p class="small" style="margin-top:-6px">É assim que vai aparecer pro seu amor.</p>
+    <div class="field"><input id="nName" maxlength="24" placeholder="Seu nome ou apelido" value="${esc(S.people[S.me]?.name||"")}"></div>
+    <div class="btns"><button class="btn p" id="nSave">Salvar</button>${force?"":`<button class="btn g" id="nCancel">Cancelar</button>`}</div>`, root=>{
+    const i = root.querySelector("#nName"); setTimeout(()=>i.focus(),250);
+    root.querySelector("#nCancel") && (root.querySelector("#nCancel").onclick = closeSheet);
+    root.querySelector("#nSave").onclick = async e=>{
+      const name = i.value.trim(); if(!name) return i.focus();
+      e.target.disabled = true;
+      try { await API.set("people/"+S.me, { name, email:S.email }); S.mustName=false; closeSheet(); toast("Prazer, "+name+" 💛"); }
+      catch(err){ e.target.disabled=false; writeErr(err); }
+    };
+  });
+}
+function openCouple(){
+  const st = { ...S.settings };
+  openSheet(`<h2>Nosso casal</h2>
+    <div class="field"><label>Foto de vocês</label><div style="display:flex;gap:14px;align-items:center">
+      <span id="cPrev">${st.photo?`<img src="${esc(st.photo)}" style="width:76px;height:76px;border-radius:50%;object-fit:cover">`:`<span style="font-size:40px">💛</span>`}</span>
+      <label class="btn g sm upl" style="cursor:pointer">📷 Escolher foto<input type="file" accept="image/*" id="cFile"></label></div></div>
+    <div class="field"><label>Nome do casal</label><input id="cTitle" maxlength="40" placeholder="Ex: Gui & Ana" value="${esc(st.title)}"></div>
+    <div class="field"><label>Juntos desde</label><input type="date" id="cSince" value="${esc(st.since||"")}" max="${today()}"></div>
+    <div class="field"><label>Cor do app</label><div class="swatches">${Object.entries(THEMES).map(([k,c])=>`<button type="button" data-th="${k}" class="${(st.theme||"coral")===k?"on":""}" style="background:${c}" aria-label="${k}"></button>`).join("")}</div></div>
+    <div class="btns"><button class="btn p" id="cSave">Salvar</button><button class="btn g" id="cCancel">Cancelar</button></div>`, root=>{
+    root.querySelector("#cCancel").onclick = ()=>{ applyTheme(); closeSheet(); };
+    root.querySelectorAll("[data-th]").forEach(b=>b.onclick=()=>{ st.theme=b.dataset.th; root.querySelectorAll("[data-th]").forEach(x=>x.classList.toggle("on",x===b)); document.documentElement.style.setProperty("--accent", THEMES[st.theme]); });
+    const f = root.querySelector("#cFile");
+    f.onchange = async ()=>{ const file=f.files[0]; if(!file) return; try{ st.photo = await shrink(file,true,400); root.querySelector("#cPrev").innerHTML = `<img src="${st.photo}" style="width:76px;height:76px;border-radius:50%;object-fit:cover">`; }catch(_){ toast("Não consegui ler essa imagem"); } };
+    root.querySelector("#cSave").onclick = async e=>{
+      e.target.disabled = true;
+      try { await API.set("settings/couple", { title: val(root,"#cTitle"), since: val(root,"#cSince"), theme: st.theme||"coral", photo: st.photo||"" }); toast("Salvo 💛"); closeSheet(); }
+      catch(err){ e.target.disabled=false; writeErr(err); }
+    };
+  });
+}
+function openGoal(){
+  openSheet(`<h2>Nova meta</h2>
+    <div class="field"><label>Meta</label><input id="gText" placeholder="Ex: Conhecer um lugar novo por mês"></div>
+    <div class="field"><label>Conta o quê</label>${chipsInput("gkind", [["place","Lugares visitados"],["watch","Filmes/séries assistidos"]], "place")}</div>
+    <div class="field"><label>Quantos</label><input id="gTarget" type="number" min="1" value="1" inputmode="numeric"></div>
+    <div class="field"><label>Por</label>${chipsInput("gper", [["mes","Mês"],["ano","Ano"]], "mes")}</div>
+    <div class="btns"><button class="btn p" id="gSave">Criar meta</button><button class="btn g" id="gCancel">Cancelar</button></div>`, root=>{
+    wireChips(root); root.querySelectorAll("[data-chips]").forEach(b=>b.setAttribute("data-req",""));
+    root.querySelector("#gCancel").onclick = closeSheet;
+    root.querySelector("#gSave").onclick = async e=>{
+      const kind = chipVal(root,"gkind"), period = chipVal(root,"gper"), target = Math.max(1, +val(root,"#gTarget")||1);
+      const text = val(root,"#gText") || `${target} ${kind==="place"?(target>1?"lugares":"lugar"):(target>1?"filmes/séries":"filme/série")} por ${period==="mes"?"mês":"ano"}`;
+      e.target.disabled = true;
+      try { await API.add("goals", { text, kind, period, target, createdAt: Date.now() }); closeSheet(); toast("Meta criada 🎯"); }
+      catch(err){ e.target.disabled=false; writeErr(err); }
+    };
+  });
+}
+
+function writeErr(err){
+  console.error(err);
+  const c = String(err && (err.code||err.message) || "");
+  if (c.includes("permission")) toast("Sem permissão — confira as regras do Firestore");
+  else if (c.includes("unavailable")) toast("Sem internet — vai salvar quando voltar");
+  else toast("Não consegui salvar. Tenta de novo.");
+}
+
+// =============== eventos ===============
+$("#nav").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  S.tab=b.dataset.tab; S.q=""; try{ history.replaceState(null,"","#"+S.tab); }catch(_){}
+  window.scrollTo(0,0); render();
+});
+$("#view").addEventListener("click", e=>{
+  const s=e.target.closest("[data-seg]");
+  if (s){ if(s.dataset.seg==="year") S.year=+s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
+  const o=e.target.closest("[data-open]"); if(o) return openDetail(o.dataset.open);
+  const gd=e.target.closest("[data-goaldel]"); if(gd) return API.del("goals/"+gd.dataset.goaldel).catch(writeErr);
+  const id = e.target.closest("button")?.id;
+  if (id==="rollBtn") openRoll();
+  else if (id==="goalAdd") openGoal();
+  else if (id==="editCouple") openCouple();
+  else if (id==="editMe") openName(false);
+  else if (id==="logout") API.signOut();
+});
+$("#fab").onclick = ()=>{
+  if (S.tab==="watched") openWatchForm("done");
+  else if (S.tab==="recs") openWatchForm("todo");
+  else openPlaceForm(S.filter.places);
+};
+
+// ---------- login ----------
+let authMode = "in";
+document.querySelectorAll("[data-am]").forEach(b=>b.onclick=()=>{
+  authMode=b.dataset.am; document.querySelectorAll("[data-am]").forEach(x=>x.classList.toggle("on",x===b));
+  $("#aNameF").style.display = authMode==="up"?"block":"none";
+  $("#aGo").textContent = authMode==="up"?"Criar conta":"Entrar";
+  $("#aPass").autocomplete = authMode==="up"?"new-password":"current-password";
+  $("#aMsg").textContent = authMode==="up"?"Use o mesmo e-mail que foi liberado nas regras do Firestore.":"";
+});
+$("#authForm").onsubmit = async e=>{
+  e.preventDefault();
+  const email=$("#aEmail").value.trim().toLowerCase(), pass=$("#aPass").value, name=$("#aName").value.trim();
+  const msg=$("#aMsg"); msg.textContent="";
+  if (authMode==="up" && !name){ msg.textContent="Coloca seu nome 🙂"; return; }
+  $("#aGo").disabled=true;
+  try {
+    if (authMode==="up"){ S.pendingName = name; await API.signUp(email, pass); }
+    else await API.signIn(email, pass);
+  } catch(err){
+    const c = String(err.code||err.message);
+    msg.textContent = c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found") ? "E-mail ou senha incorretos."
+      : c.includes("email-already-in-use") ? "Esse e-mail já tem conta — use “Entrar”."
+      : c.includes("weak-password") ? "A senha precisa ter pelo menos 6 caracteres."
+      : c.includes("invalid-email") ? "E-mail inválido."
+      : c.includes("too-many") ? "Muitas tentativas. Espere um pouco."
+      : "Não deu certo: "+c;
+  }
+  $("#aGo").disabled=false;
+};
+$("#aForgot").onclick = async ()=>{
+  const email=$("#aEmail").value.trim(); if(!email){ $("#aMsg").textContent="Digite seu e-mail acima primeiro."; return; }
+  try { await API.reset(email); $("#aMsg").textContent="Enviamos um link pra trocar a senha no seu e-mail."; } catch(_){ $("#aMsg").textContent="Não consegui enviar. Confira o e-mail."; }
+};
+
+// =============== início ===============
+let unsubs = [];
+function showSplash(){
+  const st = S.settings; if (S.splashed || !st.photo) { S.splashed = true; return; }
+  S.splashed = true;
+  $("#splashImg").src = st.photo; $("#splashT").textContent = st.title || "";
+  const since = st.since ? Math.floor((Date.now()-fromISO(st.since))/86400000) : null;
+  $("#splashS").textContent = since!=null && since>=0 ? `juntos há ${since.toLocaleString("pt-BR")} dias` : "";
+  const sp = $("#splash"); sp.classList.add("show");
+  setTimeout(()=>sp.classList.add("out"), 1300); setTimeout(()=>sp.classList.remove("show","out"), 1850);
+}
+
+(async ()=>{
+  if (!window.__MOCK__ && (!CFG.firebase || CFG.firebase.apiKey==="COLE_AQUI")){
+    document.body.innerHTML = `<div style="max-width:420px;margin:15vh auto;text-align:center;padding:20px"><div style="font-size:48px">🛠️</div><h2 style="font-family:Fraunces,serif">Quase lá!</h2><p style="color:#a89a8c">Falta colar os dados do Firebase no arquivo <b>config.js</b>. O passo a passo está no LEIA-ME.</p></div>`;
+    return;
+  }
+  try { await initAPI(); } catch(e){ document.body.innerHTML = `<p style="padding:40px;text-align:center">Não consegui carregar. Verifique sua internet.</p>`; return; }
+  API.onAuth(async u=>{
+    unsubs.forEach(f=>{ try{f();}catch(_){} }); unsubs=[];
+    if (!u){ S.me=null; $("#auth").style.display="block"; $("#app").style.display="none"; $("#nav").style.display="none"; $("#fab").style.display="none"; closeSheet(); return; }
+    S.me = u.uid; S.email = u.email || "";
+    $("#auth").style.display="none"; $("#app").style.display="block"; $("#nav").style.display="flex";
+    if (S.pendingName){ API.set("people/"+S.me, { name:S.pendingName, email:S.email }).catch(()=>{}); S.people[S.me]={name:S.pendingName}; S.pendingName=null; }
+    setStatus("Carregando…"); render();
+    const timer = setTimeout(()=>{ if(!S.loaded) setStatus("Demorando mais que o normal… confira sua internet."); }, 10000);
+    const onErr = err => { clearTimeout(timer); console.error(err);
+      setStatus(String(err.code||"").includes("permission")
+        ? `🔒 Este e-mail (<b>${esc(S.email)}</b>) não está liberado. Confira se ele está escrito igualzinho no arquivo de regras do Firestore. <button id="lo2" style="text-decoration:underline">Sair</button>`
+        : "Não consegui carregar os dados agora.");
+      $("#lo2") && ($("#lo2").onclick = ()=>API.signOut()); };
+    let gotPeople = false;
+    unsubs.push(API.watch("people", docs=>{
+      S.people = {}; docs.forEach(d=>S.people[d.id]=d); gotPeople = true;
+      if (!S.people[S.me] && !$("#sheetBg").classList.contains("show")) openName(true);
+      render();
+    }, onErr));
+    unsubs.push(API.watch("settings", docs=>{
+      S.settings = docs.find(d=>d.id==="couple") || {}; applyTheme();
+      if (S.settings.photo) $("#touchIcon").href = S.settings.photo;
+      if (!S.splashed) showSplash();
+      render();
+    }, onErr));
+    unsubs.push(API.watch("goals", docs=>{ S.goals = docs.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); render(); }, onErr));
+    unsubs.push(API.watch("items", docs=>{
+      S.items = docs; S.loaded = true; clearTimeout(timer); setStatus("");
+      render();
+    }, onErr));
+  });
+})();
+</script>
+</body>
+</html>
