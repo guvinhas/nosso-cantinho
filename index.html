@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="18">
+<meta name="app-version" content="19">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -235,6 +235,9 @@ nav button.on .i{filter:none;opacity:1}
 .castrow b{display:block;color:var(--ink);font-size:12px;line-height:1.2}
 .castrow span:not(.pface){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 nav button{min-width:56px;padding:4px 2px}
+.dseg{padding-top:2px}
+.dseg .chip{font-size:13px;padding:7px 12px}
+.dseg .chip.on{background:var(--accent);border-color:var(--accent);color:#170d08}
 .filtbar{display:flex;gap:8px;margin:6px 0 2px;flex-wrap:wrap}
 .filtbar .chip{font-size:13px;padding:7px 12px}
 .filtpanel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px 12px;margin:8px 0 4px;animation:up .15s ease-out}
@@ -599,27 +602,28 @@ function viewWatch(tab){
     ["together","Juntos"+cnt(todo.filter(togetherFn).length)], ["done","✓ Assistidos"+cnt(done.length)]);
   let f = S.filter[tab]; if (!segs.find(x=>x[0]===f)) f = S.filter[tab] = "forme";
   const fn = { watching:watchingFn, forme:forMeFn, forpartner:forPartnerFn, together:togetherFn }[f];
-  const needN = done.filter(needMyReview).length;
+  const wmF = { together:i=>watchMode(i)==="together", me:i=>watchMode(i)==="solo"&&(i.watchers||[]).includes(S.me), other:i=>watchMode(i)==="solo"&&!(i.watchers||[]).includes(S.me), apart:i=>watchMode(i)==="apart" };
+  S.doneSeg = S.doneSeg || {};
+  const dsegs = [["together","💑 Juntos"],["me","🙋 Só eu"],["other","🙋 Só "+pName()],["apart","👥 Separados"]].map(([k,l])=>[k,l,done.filter(wmF[k]).length]).filter(x=>x[0]==="together"||x[2]>0);
+  let ds = S.doneSeg[tab] || "together"; if (!dsegs.find(x=>x[0]===ds)) ds = S.doneSeg[tab] = "together";
+  const doneHere = done.filter(wmF[ds]);
+  const needN = doneHere.filter(needMyReview).length;
   if (f!=="done" || !needN) S.needOnly = false;
-  const wmF = { together:i=>watchMode(i)==="together", apart:i=>watchMode(i)==="apart", me:i=>watchMode(i)==="solo"&&(i.watchers||[]).includes(S.me), other:i=>watchMode(i)==="solo"&&!(i.watchers||[]).includes(S.me) };
-  const hasModes = done.some(i=>watchMode(i)!=="together");
-  if (!hasModes || f!=="done") S.wmFilter = "";
-  const base = f==="done" ? (S.needOnly ? done.filter(needMyReview) : done).filter(i=>!S.wmFilter || wmF[S.wmFilter](i)) : todo.filter(fn);
+  const base = f==="done" ? (S.needOnly ? doneHere.filter(needMyReview) : doneHere) : todo.filter(fn);
   const genres = [...new Set(base.flatMap(i=>i.genres||[]))].sort((a,b)=>a.localeCompare(b));
   if (S.genre[tab] && !genres.includes(S.genre[tab])) S.genre[tab] = "";
   const gsel = S.genre[tab];
   const list = base.filter(i=>!gsel || (i.genres||[]).includes(gsel)).filter(match)
     .sort((a,b)=> f==="done" ? sortAt(b)-sortAt(a) : (b.createdAt||0)-(a.createdAt||0));
   let h = segHTML(segs, f, tab);
-  const wmOpts = [["","Todos"],["together","💑 Juntos"],["apart","👥 Separados"],["me","🙋 Só eu"],["other","🙋 Só "+pName()]];
-  const showWm = f==="done" && hasModes;
-  if (genres.length || showWm){
-    const act = [gsel, showWm && S.wmFilter ? (wmOpts.find(o=>o[0]===S.wmFilter)||[])[1] : ""].filter(Boolean);
+  if (f==="done" && dsegs.length>1) h += `<div class="seg dseg">${dsegs.map(([k,l,n])=>`<button class="chip ${ds===k?"on":""}" data-dseg="${k}">${esc(l)} (${n})</button>`).join("")}</div>`;
+  const showWm = false;
+  if (genres.length){
+    const act = [gsel].filter(Boolean);
     h += `<div class="filtbar"><button class="chip ${act.length?"on":""}" id="filtBtn">⚙️ Filtros${act.length?` · ${esc(act.join(" · "))}`:""} <span style="opacity:.7">${S.filtOpen?"▴":"▾"}</span></button>${act.length?`<button class="chip" id="filtClear">✕ Limpar</button>`:""}</div>`;
     if (S.filtOpen){
       h += `<div class="filtpanel">`;
       if (genres.length) h += `<div class="flabel">Gênero</div><div class="chips">${[["","Todos"], ...genres.map(g=>[g,g])].map(([k,l])=>`<button class="chip ${gsel===k?"on":""}" data-genre="${esc(k)}">${esc(l)}</button>`).join("")}</div>`;
-      if (showWm) h += `<div class="flabel">Como assistiram</div><div class="chips">${wmOpts.map(([k,l])=>`<button class="chip ${(S.wmFilter||"")===k?"on":""}" data-wm="${k}">${esc(l)}</button>`).join("")}</div>`;
       h += `</div>`;
     }
   }
@@ -636,7 +640,7 @@ function viewWatch(tab){
     }[f];
     return h + emptyHTML(f==="done"?"🍿":"💌", msg);
   }
-  if (f==="done") return h + `<div class="stats" style="align-items:center"><span><b>${done.length}</b> ${word}${done.length!==1?"s":""}</span>${needN?`<button class="chip ${S.needOnly?"on":""}" id="needBtn" style="margin-left:auto;font-size:13px;padding:6px 12px">⭐ Falta eu avaliar (${needN})</button>`:""}</div><div class="grid">${list.map(it=>`
+  if (f==="done") return h + `<div class="stats" style="align-items:center"><span><b>${doneHere.length}</b> ${word}${doneHere.length!==1?"s":""}${ds==="together"?" juntos":ds==="me"?" só seus":ds==="other"?` só de ${esc(pName())}`:" separados"}</span>${needN?`<button class="chip ${S.needOnly?"on":""}" id="needBtn" style="margin-left:auto;font-size:13px;padding:6px 12px">⭐ Falta eu avaliar (${needN})</button>`:""}</div><div class="grid">${list.map(it=>`
     <button class="poster" data-open="${esc(it.id)}">${coverHTML(it, (isNew(it)?`<span class="newtag">NOVO</span>`:needMyReview(it)&&partnerReviewed(it)?`<span class="newtag">SUA VEZ ⭐</span>`:"") + (watchModeTag(it)?`<span class="badge">${esc(watchModeTag(it))}</span>`:""))}<div class="t">${esc(it.title)}</div><div class="s">${starStr(avgRating(it))}</div></button>`).join("")}</div>`;
   return h + `<div class="list">${list.map(recRow).join("")}</div>`;
 }
@@ -970,6 +974,7 @@ function openWatchForm(status, it, mt, defFor){
         await API.add("items", data);
         const wantTab = data.mediaType==="serie" ? "series" : "movies";
         const wantSeg = isRec ? ({other:"forpartner", self:"forme", both:"together"}[data.recFor]) : "done";
+        if (!isRec){ S.doneSeg = S.doneSeg||{}; S.doneSeg[wantTab] = data.watchMode==="solo" ? ((data.watchers||[]).includes(S.me) ? "me" : "other") : (data.watchMode||"together"); }
         if (S.tab!==wantTab || S.filter[wantTab]!==wantSeg){ S.tab = wantTab; S.filter[wantTab] = wantSeg; render(); }
         toast(isRec ? (data.recFor==="other" ? `Indicado pra ${pName()} 💌` : "Adicionado à lista ✓") : "Adicionado ✓"); closeSheet();
       } catch(err){ e.target.disabled=false; writeErr(err); }
@@ -1176,7 +1181,7 @@ function openReview(it, markDone){
       const patch = {};
       const iWatched = !patch.watchMode || patch.watchMode!=="solo" || (patch.watchers||[]).includes(S.me);
       if (iWatched && (rating || text || r.rating || r.text)){ patch[`reviews.${S.me}.rating`] = rating; patch[`reviews.${S.me}.text`] = text; patch[`reviews.${S.me}.at`] = Date.now(); }
-      if (markDone){ patch.doneBy=S.me; patch.doneMarkedAt=Date.now(); patch.status="done"; Object.assign(patch, readDateField(root)); if (root.querySelector('[data-chips="fwm"]')) Object.assign(patch, readWatchField(root)); patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
+      if (markDone){ patch.doneBy=S.me; patch.doneMarkedAt=Date.now(); patch.status="done"; Object.assign(patch, readDateField(root)); if (root.querySelector('[data-chips="fwm"]')) Object.assign(patch, readWatchField(root)); if (it.kind==="watch"){ S.doneSeg=S.doneSeg||{}; S.doneSeg[it.mediaType==="serie"?"series":"movies"] = patch.watchMode==="solo" ? ((patch.watchers||[]).includes(S.me)?"me":"other") : (patch.watchMode||"together"); } patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
       if (!Object.keys(patch).length) return openDetail(it.id);
       e.target.disabled = true;
       try { await API.update("items/"+it.id, patch); toast(markDone ? (isPlace?"Marcado como visitado 📍":"Foi pra Assistidos 🎬") : "Salvo ✓"); markDone ? closeSheet() : openDetail(it.id); }
@@ -2132,10 +2137,10 @@ $("#nav").addEventListener("click", e=>{
 $("#view").addEventListener("click", e=>{
   const s=e.target.closest("[data-seg]");
   if (s){ S.filtOpen=false; if(s.dataset.seg==="year") S.year=+s.dataset.val; else if(s.dataset.seg==="us") S.usSeg=s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
-  const wb=e.target.closest("[data-wm]"); if(wb){ S.wmFilter=wb.dataset.wm; S.filtOpen=false; render(); return; }
+  const dsb=e.target.closest("[data-dseg]"); if(dsb){ S.doneSeg=S.doneSeg||{}; S.doneSeg[S.tab]=dsb.dataset.dseg; S.filtOpen=false; S.genre[S.tab]=""; render(); return; }
   const gb=e.target.closest("[data-genre]"); if(gb){ S.genre[S.tab]=gb.dataset.genre; S.filtOpen=false; render(); return; }
   const fbtn=e.target.closest("#filtBtn"); if(fbtn){ S.filtOpen=!S.filtOpen; render(); return; }
-  const fcl=e.target.closest("#filtClear"); if(fcl){ S.genre[S.tab]=""; S.wmFilter=""; S.filtOpen=false; render(); return; }
+  const fcl=e.target.closest("#filtClear"); if(fcl){ S.genre[S.tab]=""; S.filtOpen=false; render(); return; }
   const o=e.target.closest("[data-open]"); if(o) return openDetail(o.dataset.open);
   const gd=e.target.closest("[data-goaldel]"); if(gd) return API.del("goals/"+gd.dataset.goaldel).catch(writeErr);
   const id = e.target.closest("button")?.id;
