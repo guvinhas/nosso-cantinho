@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="21">
+<meta name="app-version" content="22">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -2088,11 +2088,22 @@ const isFollowing = (type, id) => S.follows.some(f=>f.type===type && f.tmdbId===
 async function toggleFollow(type, id, name, img){
   const key = type+"_"+id;
   if (isFollowing(type, id)){ await API.del("follows/"+key); S.follows = S.follows.filter(f=>!(f.type===type&&f.tmdbId===id)); toast("Deixou de seguir"); }
-  else { const d = { type, tmdbId:id, name, img:img||"", createdBy:S.me, createdAt:Date.now() }; await API.set("follows/"+key, d); S.follows.push({ id:key, ...d }); toast(`Seguindo ${name} 🔔`); }
+  else {
+    const d = { type, tmdbId:id, name, img:img||"", createdBy:S.me, createdAt:Date.now() }; await API.set("follows/"+key, d); S.follows.push({ id:key, ...d });
+    let extra = 0;
+    if (type==="collection"){ // o TMDB às vezes divide a franquia (ex.: Jogos Vorazes e Jogos Vorazes: Nova Trilogia) — segue as irmãs também
+      try { const base = collBase(name); const r = await TMDB.get("/search/collection", { query: base });
+        for (const c of (r.results||[])){ if (c.id===id || isFollowing("collection", c.id) || collBase(c.name).toLowerCase()!==base.toLowerCase()) continue;
+          const k2 = "collection_"+c.id, d2 = { type:"collection", tmdbId:c.id, name:c.name, img:c.poster_path||"", createdBy:S.me, createdAt:Date.now() };
+          await API.set("follows/"+k2, d2); S.follows.push({ id:k2, ...d2 }); extra++; } } catch(_){}
+    }
+    toast(`Seguindo ${type==="collection"?cleanColl(name):name}${extra?` (+${extra} da mesma franquia)`:""} 🔔`);
+  }
   try { localStorage.removeItem("cantinho_rel"); } catch(_){}
   S.relList = null;
 }
-const cleanColl = n => (n||"").replace(/\s*[-–:]?\s*(Coleção|Collection|Saga|Franquia)\s*$/i,"").replace(/^(Coleção|Collection)\s*/i,"").trim();
+const cleanColl = n => (n||"").replace(/\s*[:\-–]\s*(Coleção|Collection)(\s+d[aoe]s?)?\s*/i, ": ").replace(/\s*(Coleção|Collection|Saga|Franquia)\s*$/i,"").replace(/^(Coleção|Collection)\s*(d[aoe]s?\s+)?/i,"").replace(/[:\s]+$/,"").trim();
+const collBase = n => cleanColl(n).split(":")[0].trim();
 TMDB.collection = async function(id){ const k="coll"+id; if (this._cache[k]) return this._cache[k]; return this._cache[k] = await this.get(`/collection/${id}`); };
 function followSources(){
   const list = S.follows.map(f=>({ type:f.type, id:f.tmdbId, name:f.name }));
