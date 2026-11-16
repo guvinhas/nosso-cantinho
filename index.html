@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="10">
+<meta name="app-version" content="11">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -362,7 +362,7 @@ const TMDB = {
   },
   async details(type, id){
     const k = type+id; if (this._cache[k]) return this._cache[k];
-    const d = await this.get(`/${type}/${id}`, { append_to_response:"watch/providers,images", include_image_language:"pt,en,null" });
+    const d = await this.get(`/${type}/${id}`, { append_to_response:"watch/providers,images,videos", include_image_language:"pt,en,null", include_video_language:"pt,en,null" });
     this._cache[k] = d; return d;
   }
 };
@@ -372,6 +372,31 @@ function provsBR(d){
   const m = a => (a||[]).sort((x,y)=>(x.display_priority||0)-(y.display_priority||0)).map(p=>({ name:p.provider_name, logo:p.logo_path }));
   return { link: br.link, stream: m(br.flatrate).concat(m(br.free), m(br.ads)), rent: m(br.rent), buy: m(br.buy) };
 }
+function trailersOf(d){
+  const vs = ((d && d.videos && d.videos.results) || []).filter(v=>v.site==="YouTube" && v.key && (v.type==="Trailer" || v.type==="Teaser"));
+  const score = v => (v.type==="Trailer"?0:10) + (v.official?0:2) + (v.iso_639_1==="pt"?0:v.iso_639_1==="en"?5:8);
+  const sorted = vs.sort((a,b)=>score(a)-score(b));
+  const out = [], seen = new Set();
+  for (const v of sorted){ const lang = v.iso_639_1==="pt" ? "pt" : "en"; if (seen.has(lang)) continue; seen.add(lang); out.push({ key:v.key, lang, name:v.name }); }
+  return out.slice(0,2);
+}
+function trailerHTML(d){
+  const ts = trailersOf(d); if (!ts.length) return "";
+  const lbl = t => ts.length>1 ? (t.lang==="pt" ? "▶ Trailer em português" : "▶ Trailer original") : "▶ Ver trailer";
+  return `<div class="chips" style="margin:10px 0">${ts.map(t=>`<button type="button" class="chip tr" data-yt="${esc(t.key)}">${lbl(t)}</button>`).join("")}</div>`;
+}
+function openTrailer(key){
+  const ov = document.createElement("div"); ov.id = "trPlayer"; ov.className = "sheet-bg show"; ov.style.cssText = "z-index:80;align-items:center;background:rgba(0,0,0,.92)";
+  ov.innerHTML = `<div style="width:100%;max-width:900px;padding:0 12px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="sheet-x" style="position:static;float:none;margin:0">✕</button></div>
+    <div style="position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000">
+      <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&playsinline=1&rel=0" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
+    <a class="small" href="https://www.youtube.com/watch?v=${encodeURIComponent(key)}" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:12px;text-decoration:underline">Abrir no YouTube</a></div>`;
+  document.body.appendChild(ov);
+  const close = ()=>ov.remove();
+  ov.querySelector(".sheet-x").onclick = close; ov.addEventListener("click", e=>{ if (e.target===ov) close(); });
+}
+document.addEventListener("click", e=>{ const b = e.target.closest("[data-yt]"); if (b){ e.preventDefault(); e.stopPropagation(); openTrailer(b.dataset.yt); } }, true);
 function provsHTML(p){
   if (!p) return `<div class="small">Não encontramos onde assistir no Brasil agora.</div>`;
   const g = (t, list) => list.length ? `<div class="prov-group">${t?`<div class="meta">${t}</div>`:""}<div class="provs">${list.map(x=>`<span class="prov">${x.logo?`<img src="${IMG}w92${esc(x.logo)}" alt="">`:""}${esc(x.name)}</span>`).join("")}</div></div>` : "";
@@ -888,7 +913,7 @@ function openDetail(id){
     </div></div>`;
   if (it.note) html += `<div class="sec">${isPlace?"Notas":done?"Por que foi indicado":"Por que assistir"}</div><div class="rev"><p style="margin:0">${esc(it.note)}</p></div>`;
   if (it.overview) html += `<div class="sec">Sinopse</div><div class="overview">${esc(it.overview)}</div>`;
-  if (!isPlace && it.tmdbId) html += `<div class="sec">Onde assistir no Brasil</div><div id="liveProv"><div class="small">Buscando…</div></div>`;
+  if (!isPlace && it.tmdbId) html += `<div id="trBox"></div><div class="sec">Onde assistir no Brasil</div><div id="liveProv"><div class="small">Buscando…</div></div>`;
   if (isPlace){
     const q = encodeURIComponent([it.title, it.address, it.city].filter(Boolean).join(", "));
     html += `<div class="sec">Mapa</div><div class="btns h"><a class="btn g" href="https://maps.apple.com/?q=${q}" target="_blank" rel="noopener">🗺️ Apple Maps</a><a class="btn g" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">📍 Google Maps</a></div>`;
@@ -949,7 +974,7 @@ function openDetail(id){
     const lp = root.querySelector("#liveProv");
     if (lp){
       if (!TMDB.ok()) lp.innerHTML = `<div class="small">Configure a chave do TMDB para ver.</div>`;
-      else TMDB.details(it.tmdbType, it.tmdbId).then(d=>{ lp.innerHTML = provsHTML(provsBR(d)); }).catch(()=>{ lp.innerHTML = `<div class="small">Não consegui buscar agora.</div>`; });
+      else TMDB.details(it.tmdbType, it.tmdbId).then(d=>{ lp.innerHTML = provsHTML(provsBR(d)); const tr = trailerHTML(d); if (tr) root.querySelector("#trBox").innerHTML = tr; }).catch(()=>{ lp.innerHTML = `<div class="small">Não consegui buscar agora.</div>`; });
     }
   });
 }
@@ -1078,7 +1103,7 @@ function openRoll(){
           go.textContent = "Sortear outro"; go.disabled = false;
           const box = out.querySelector('[data-chips="hfor"]'); box.setAttribute("data-req",""); wireChips(out);
           let det = null;
-          try { det = await TMDB.details(tt, r.id); out.querySelector("#hotProv").innerHTML = provsHTML(provsBR(det)); }
+          try { det = await TMDB.details(tt, r.id); out.querySelector("#hotProv").innerHTML = trailerHTML(det) + provsHTML(provsBR(det)); }
           catch(_){ out.querySelector("#hotProv").innerHTML = ""; }
           out.querySelector("#hotAdd").onclick = async e=>{
             e.target.disabled = true;
@@ -1239,7 +1264,7 @@ async function openTmdbThing(tt, id){
         <h2>${esc(d.title||d.name)}</h2><div class="meta">${[tt==="tv"?"Série":"Filme", (d.release_date||d.first_air_date||"").slice(0,4), (d.genres||[]).slice(0,3).map(g=>g.name).join(", ")].filter(Boolean).map(esc).join(" · ")}</div>
         ${d.vote_average?`<div class="small" style="margin-top:6px">★ ${d.vote_average.toFixed(1)} no TMDB</div>`:""}</div></div>
       ${d.overview?`<div class="sec">Sinopse</div><div class="overview">${esc(d.overview)}</div>`:""}
-      <div class="sec">Onde assistir no Brasil</div>${provsHTML(p)}
+      ${trailerHTML(d)}<div class="sec">Onde assistir no Brasil</div>${provsHTML(p)}
       <div class="field" style="margin-top:14px"><label>Adicionar em</label>${chipsInput("pfor", [["both","💑 Juntos"],["self","🙋 Eu quero ver"],["other","💌 Pra "+pName()]], "both")}</div>
       <div class="btns"><button class="btn p" id="pAdd">➕ Adicionar à lista</button><button class="btn g" id="pX">Fechar</button></div>`, root=>{
       wireChips(root); root.querySelector('[data-chips="pfor"]').setAttribute("data-req","");
@@ -1534,10 +1559,10 @@ function swipeCard(el, onVote){
 }
 function openTmdbPeekOverlay(tt, c){
   const ov = overlaySheet(`<h2>${esc(c.t)}</h2><div class="meta" style="margin:-8px 0 10px">${[c.y, (c.g||[]).join(", ")].filter(Boolean).map(esc).join(" · ")}</div>
-    ${c.o?`<div class="overview">${esc(c.o)}</div>`:""}<div class="sec">Onde assistir</div><div id="pvP" class="small">Buscando…</div>
+    ${c.o?`<div class="overview">${esc(c.o)}</div>`:""}<div id="pvT"></div><div class="sec">Onde assistir</div><div id="pvP" class="small">Buscando…</div>
     <div class="btns" style="margin-top:12px"><button class="btn g" id="pvX">Voltar</button></div>`);
   ov.querySelector("#pvX").onclick = ()=>ov.remove();
-  TMDB.details(tt, c.id).then(d=>{ ov.querySelector("#pvP").innerHTML = provsHTML(provsBR(d)); ov.querySelector("#pvP").className=""; }).catch(()=>{ ov.querySelector("#pvP").textContent=""; });
+  TMDB.details(tt, c.id).then(d=>{ ov.querySelector("#pvP").innerHTML = provsHTML(provsBR(d)); ov.querySelector("#pvP").className=""; const tr=trailerHTML(d); if (tr) ov.querySelector("#pvT").innerHTML = tr; }).catch(()=>{ ov.querySelector("#pvP").textContent=""; });
 }
 function openMatchSetup(tt){
   const word = tt==="tv" ? "séries" : "filmes";
