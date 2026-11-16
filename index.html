@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="14">
+<meta name="app-version" content="15">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -215,6 +215,26 @@ nav button.on .i{filter:none;opacity:1}
 .sheet.tall{min-height:calc(100vh - var(--st) - 24px);min-height:calc(100dvh - var(--st) - 24px)}
 .shead,.shead-wrap>.field:first-child{position:sticky;top:-10px;z-index:4;background:var(--bg2);padding-top:4px}
 .shead-wrap>.field:first-child{padding-bottom:8px;margin-bottom:0}
+.pface{width:56px;height:56px;border-radius:50%;overflow:hidden;flex:none;background:var(--bg2);display:flex;align-items:center;justify-content:center}
+.pface img{width:100%;height:100%;object-fit:cover}
+.pface.big{width:96px;height:96px}
+.res.big .pface{width:56px;height:56px}
+.noface{font-size:24px}
+.bio{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.bio.open{display:block}
+.row.work{align-items:center;padding:8px}
+.row.work .wopen img,.row.work .wopen .noimg{width:44px;height:66px;border-radius:6px;object-fit:cover;display:block;background:var(--line)}
+.row.work.seen{opacity:.6}
+.wn{width:26px;text-align:center;color:var(--mute);font-size:13px;flex:none}
+.wst{flex:none;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--line);font-size:16px}
+.wst.done{background:#2f7d55;border-color:#3ecf8e;color:#fff}
+.wst.add{font-size:20px;color:var(--accent)}
+.castrow{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px;margin:0 -18px;padding-left:18px;padding-right:18px}
+.castrow button{flex:none;width:76px;text-align:center;font-size:11px;color:var(--mute)}
+.castrow .pface{width:64px;height:64px;margin:0 auto 6px}
+.castrow b{display:block;color:var(--ink);font-size:12px;line-height:1.2}
+.castrow span:not(.pface){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+nav button{min-width:56px;padding:4px 2px}
 .toast{position:fixed;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:500;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 #auth{display:none;max-width:420px;margin:0 auto;padding-top:8vh}
@@ -268,6 +288,7 @@ nav button.on .i{filter:none;opacity:1}
 <nav id="nav" style="display:none">
   <button data-tab="movies"><span class="i">🎬</span>Filmes</button>
   <button data-tab="series"><span class="i">📺</span>Séries</button>
+  <button data-tab="people"><span class="i">🎭</span>Pessoas</button>
   <button data-tab="places"><span class="i">📍</span>Lugares</button>
   <button data-tab="us"><span class="i">💛</span>Nós</button>
 </nav>
@@ -290,11 +311,11 @@ const MESES_L = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","
 
 const CFG = window.APP_CONFIG || {};
 const S = {
-  tab: ["series","places","us"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "movies",
+  tab: ["series","people","places","us"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "movies",
   filter: { movies:"forme", series:"forme", places:"todo" },
   genre: { movies:"", series:"" },
   q: "", year: new Date().getFullYear(),
-  items: [], people: {}, settings: {}, goals: [], folders: [], match: {}, usSeg: "us", visited: new Set(), toasted: new Set(),
+  items: [], people: {}, settings: {}, goals: [], folders: [], match: {}, marathons: [], faces: null, usSeg: "us", visited: new Set(), toasted: new Set(),
   me: null, email: "", loaded: false, splashed: false
 };
 const $ = s => document.querySelector(s);
@@ -409,7 +430,7 @@ const TMDB = {
   },
   async details(type, id){
     const k = type+id; if (this._cache[k]) return this._cache[k];
-    const d = await this.get(`/${type}/${id}`, { append_to_response:"watch/providers,images,videos", include_image_language:"pt,en,null", include_video_language:"pt,en,null" });
+    const d = await this.get(`/${type}/${id}`, { append_to_response:"watch/providers,images,videos,credits", include_image_language:"pt,en,null", include_video_language:"pt,en,null" });
     this._cache[k] = d; return d;
   }
 };
@@ -505,16 +526,18 @@ function applyTheme(){
 // =============== render ===============
 function render(){
   if (!S.me) return;
+  if (S.tab==="people" && document.activeElement && document.activeElement.id==="pq" && $("#pq")) return; // não atrapalhar quem está digitando
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===S.tab));
   if (S.newsReady) S.visited.add(S.tab);
-  $("#pageTitle").textContent = {movies:"Filmes", series:"Séries", places:"Lugares", us:"Nós dois"}[S.tab];
+  $("#pageTitle").textContent = {movies:"Filmes", series:"Séries", people:"Pessoas", places:"Lugares", us:"Nós dois"}[S.tab];
   const o = other(), st = S.settings;
   $("#hello").textContent = st.title || (o ? `${nameRaw(S.me)} & ${nameRaw(o)}` : `Oi, ${nameRaw(S.me)}`);
   const av = $("#hdrAv"); if (st.photo){ av.src = st.photo; av.style.display="block"; } else av.style.display="none";
   const v = $("#view");
-  v.innerHTML = S.tab==="movies"||S.tab==="series" ? viewWatch(S.tab) : S.tab==="places" ? viewPlaces() : viewUs();
+  v.innerHTML = S.tab==="movies"||S.tab==="series" ? viewWatch(S.tab) : S.tab==="people" ? viewPeople() : S.tab==="places" ? viewPlaces() : viewUs();
+  if (S.tab==="people") wirePeopleView();
   const si = $("#q"); if (si){ si.value=S.q; si.oninput=e=>{ S.q=e.target.value; const p=e.target.selectionStart; render(); const n=$("#q"); n.focus(); try{n.setSelectionRange(p,p);}catch(_){} }; }
-  $("#fab").style.display = S.tab==="us" ? "none" : "flex";
+  $("#fab").style.display = S.tab==="us" || S.tab==="people" ? "none" : "flex";
   if (S.newsReady) renderBell();
 }
 
@@ -974,7 +997,7 @@ function openDetail(id){
     </div></div>`;
   if (it.note) html += `<div class="sec">${isPlace?"Notas":done?"Por que foi indicado":"Por que assistir"}</div><div class="rev"><p style="margin:0">${esc(it.note)}</p></div>`;
   if (it.overview) html += `<div class="sec">Sinopse</div><div class="overview">${esc(it.overview)}</div>`;
-  if (!isPlace && it.tmdbId) html += `<div id="trBox"></div><div class="sec">Onde assistir no Brasil</div><div id="liveProv"><div class="small">Buscando…</div></div>`;
+  if (!isPlace && it.tmdbId) html += `<div id="trBox"></div><div id="castBox"></div><div class="sec">Onde assistir no Brasil</div><div id="liveProv"><div class="small">Buscando…</div></div>`;
   if (isPlace){
     const q = encodeURIComponent([it.title, it.address, it.city].filter(Boolean).join(", "));
     html += `<div class="sec">Mapa</div><div class="btns h"><a class="btn g" href="https://maps.apple.com/?q=${q}" target="_blank" rel="noopener">🗺️ Apple Maps</a><a class="btn g" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">📍 Google Maps</a></div>`;
@@ -1056,7 +1079,7 @@ function openDetail(id){
     const lp = root.querySelector("#liveProv");
     if (lp){
       if (!TMDB.ok()) lp.innerHTML = `<div class="small">Configure a chave do TMDB para ver.</div>`;
-      else TMDB.details(it.tmdbType, it.tmdbId).then(d=>{ lp.innerHTML = provsHTML(provsBR(d)); const tr = trailerHTML(d); if (tr) root.querySelector("#trBox").innerHTML = tr; }).catch(()=>{ lp.innerHTML = `<div class="small">Não consegui buscar agora.</div>`; });
+      else TMDB.details(it.tmdbType, it.tmdbId).then(d=>{ lp.innerHTML = provsHTML(provsBR(d)); const tr = trailerHTML(d); if (tr) root.querySelector("#trBox").innerHTML = tr; const cb = root.querySelector("#castBox"); if (cb) cb.innerHTML = castHTML(d, it); }).catch(()=>{ lp.innerHTML = `<div class="small">Não consegui buscar agora.</div>`; });
     }
   });
 }
@@ -1358,7 +1381,7 @@ async function openTmdbThing(tt, id){
         <h2>${esc(d.title||d.name)}</h2><div class="meta">${[tt==="tv"?"Série":"Filme", (d.release_date||d.first_air_date||"").slice(0,4), (d.genres||[]).slice(0,3).map(g=>g.name).join(", ")].filter(Boolean).map(esc).join(" · ")}</div>
         ${d.vote_average?`<div class="small" style="margin-top:6px">★ ${d.vote_average.toFixed(1)} no TMDB</div>`:""}</div></div>
       ${d.overview?`<div class="sec">Sinopse</div><div class="overview">${esc(d.overview)}</div>`:""}
-      ${trailerHTML(d)}<div class="sec">Onde assistir no Brasil</div>${provsHTML(p)}
+      ${trailerHTML(d)}${castHTML(d, null)}<div class="sec">Onde assistir no Brasil</div>${provsHTML(p)}
       <div class="field" style="margin-top:14px"><label>Adicionar em</label>${chipsInput("pfor", [["both","💑 Juntos"],["self","🙋 Eu quero ver"],["other","💌 Pra "+pName()]], "both")}</div>
       <div class="btns"><button class="btn p" id="pAdd">➕ Adicionar à lista</button><button class="btn g" id="pX">Fechar</button></div>`, root=>{
       wireChips(root); root.querySelector('[data-chips="pfor"]').setAttribute("data-req","");
@@ -1500,6 +1523,8 @@ function buildEvents(since){
   }
   for (const [tt, m] of Object.entries(S.match)) if (m && m.createdBy===o && (m.createdAt||0) > since)
     ev.push({ key:"m"+tt+m.createdAt, at:m.createdAt, match:tt, icon:"🤝", tab: tt==="tv"?"series":"movies", txt: `${on} começou uma rodada do <b>Topa?</b> de ${tt==="tv"?"séries":"filmes"} — bora votar!` });
+  for (const m of S.marathons) if (m.createdBy===o && (m.createdAt||0) > since)
+    ev.push({ key:"mr"+m.id, at:m.createdAt, mara:m.id, icon:"🏁", tab:"people", txt: `${on} começou a <b>maratona ${esc(m.name)}</b>` });
   for (const f of S.folders) if (f.createdBy===o && (f.createdAt||0) > since)
     ev.push({ key:"f"+f.id, at:f.createdAt, folder:f.id, icon:f.emoji||"📁", tab:"us", txt: `${on} criou a pasta <b>${esc(f.name)}</b>` });
   for (const g of S.goals) if (g.createdBy===o && (g.createdAt||0) > since)
@@ -1529,7 +1554,7 @@ function openNews(auto){
   openSheet(`<h2>✨ Novidades</h2>
     ${!o ? `<div class="small">Quando ${esc(pName())} entrar no app, o que ele(a) fizer aparece aqui.</div>` :
       !list.length ? emptyHTML("🍃", `Nada novo de ${esc(nameRaw(o))} nos últimos dias.`) :
-      `<div class="list" style="margin-top:0">${list.map(e=>`<button class="row news ${fresh.has(e.key)?"fresh":""}" ${e.it?`data-nopen="${esc(e.it.id)}"`:e.folder?`data-nfolder="${esc(e.folder)}"`:e.match?`data-nmatch="${e.match}"`:""}>
+      `<div class="list" style="margin-top:0">${list.map(e=>`<button class="row news ${fresh.has(e.key)?"fresh":""}" ${e.it?`data-nopen="${esc(e.it.id)}"`:e.folder?`data-nfolder="${esc(e.folder)}"`:e.match?`data-nmatch="${e.match}"`:e.mara?`data-nmara="${esc(e.mara)}"`:""}>
         ${e.it ? coverHTML(e.it) : `<div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:30px;aspect-ratio:1/1">${e.icon}</div>`}
         <div class="body"><div style="font-size:14px;line-height:1.35">${e.it?e.icon+" ":""}${e.txt}</div>
           ${e.quote?`<div class="note">“${esc(e.quote)}”</div>`:""}
@@ -1540,6 +1565,7 @@ function openNews(auto){
     root.querySelectorAll("[data-nopen]").forEach(b=>b.onclick=()=>{ markSeen(); openDetail(b.dataset.nopen); });
     root.querySelectorAll("[data-nfolder]").forEach(b=>b.onclick=()=>{ markSeen(); openFolder(b.dataset.nfolder); });
     root.querySelectorAll("[data-nmatch]").forEach(b=>b.onclick=()=>{ markSeen(); openMatch(b.dataset.nmatch); });
+    root.querySelectorAll("[data-nmara]").forEach(b=>b.onclick=()=>{ markSeen(); openMarathon(b.dataset.nmara); });
   });
 }
 function newsTick(){
@@ -1697,6 +1723,222 @@ function openMatchSetup(tt){
   });
 }
 
+// =============== 🎭 pessoas ===============
+const SELF_RX = /\b(self|herself|himself|themselves|ela mesma|ele mesmo|narrator|narradora?)\b/i;
+const credCache = {
+  _m: null,
+  load(){ if (this._m) return this._m; try { this._m = JSON.parse(localStorage.getItem("cantinho_cred")||"{}"); } catch(_){ this._m = {}; } return this._m; },
+  get(k){ return this.load()[k]; },
+  set(k, c){ const m = this.load(); m[k] = c; try { localStorage.setItem("cantinho_cred", JSON.stringify(m)); } catch(_){} },
+  fromCredits(cr){
+    const cast = (cr && cr.cast || []).slice(0,12).map(c=>[c.id, c.name, c.profile_path||"", (c.character||(c.roles&&c.roles[0]&&c.roles[0].character)||"")]);
+    const dir = (cr && cr.crew || []).filter(c=>c.job==="Director").slice(0,3).map(c=>[c.id, c.name, c.profile_path||""]);
+    return { c: cast, d: dir };
+  }
+};
+async function creditsOf(type, id){
+  const k = type+id, hit = credCache.get(k); if (hit) return hit;
+  const cr = await TMDB.get(`/${type}/${id}/credits`);
+  const v = credCache.fromCredits(cr); credCache.set(k, v); return v;
+}
+TMDB.person = async function(id){
+  const k = "person"+id; if (this._cache[k]) return this._cache[k];
+  const p = await this.get(`/person/${id}`, { append_to_response:"combined_credits" });
+  if (!p.biography){ try { const en = await this.get(`/person/${id}`, { language:"en-US" }); p.biography = en.biography || ""; p.bioEn = true; } catch(_){} }
+  return this._cache[k] = p;
+};
+const profImg = (path, size="w185") => path ? `<img src="${IMG}${size}${esc(path)}" alt="" loading="lazy">` : `<span class="noface">🎭</span>`;
+function personWorks(p, mode, includeTv){
+  const cc = p.combined_credits || {}, today = Date.now(), seen = new Set(), out = [];
+  const src = mode==="crew" ? (cc.crew||[]).filter(c=>c.job==="Director") : (cc.cast||[]);
+  for (const c of src){
+    if (c.video) continue;
+    if (c.media_type==="tv" && (!includeTv || (c.genre_ids||[]).some(g=>[10763,10764,10767].includes(g)))) continue;
+    if (c.media_type!=="movie" && c.media_type!=="tv") continue;
+    if (mode!=="crew" && SELF_RX.test(c.character||"")) continue;
+    if (!c.poster_path && (c.vote_count||0) < 5) continue;
+    const key = c.media_type+c.id; if (seen.has(key)) continue; seen.add(key);
+    const date = c.release_date || c.first_air_date || "";
+    out.push({ id:c.id, type:c.media_type, t:c.title||c.name, y:date.slice(0,4), date, p:c.poster_path||"", pop:c.popularity||0, ch: mode==="crew" ? "Direção" : (c.character||""), soon: !date || new Date(date).getTime() > today });
+  }
+  return out;
+}
+const sortWorks = (ws, order) => ws.slice().sort(order==="popular" ? (a,b)=>b.pop-a.pop : (a,b)=>(a.date||"9999").localeCompare(b.date||"9999"));
+function workStatus(w){ const it = S.items.find(i=>i.tmdbId===w.id && i.tmdbType===w.type); return it ? (it.status==="done" ? "done" : "list") : ""; }
+
+function viewPeople(){
+  let h = `<div class="field" style="margin-top:10px"><input id="pq" placeholder="🔎 Buscar ator, atriz ou diretor…" autocomplete="off" autocapitalize="off" value="${esc(S.pq||"")}"></div><div id="presults"></div>`;
+  // maratonas
+  const ms = S.marathons.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  h += `<div class="sec">🏁 Maratonas</div>`;
+  if (!ms.length) h += `<div class="small">Busque alguém e toque em “Começar maratona” pra assistir tudo dessa pessoa — tipo todos os filmes da Anne Hathaway.</div>`;
+  else h += `<div class="list" style="margin-top:0">${ms.map(m=>{
+    const valid = (m.list||[]).filter(w=>!w.soon), done = valid.filter(w=>workStatus(w)==="done").length, total = valid.length;
+    const next = sortWorks(valid, m.order).find(w=>workStatus(w)!=="done");
+    return `<button class="row" data-mara="${esc(m.id)}"><div class="pface">${profImg(m.photo)}</div><div class="body">
+      <div class="title">${esc(m.name)}</div><div class="meta">${m.mode==="crew"?"Como diretor(a)":"Como ator/atriz"} · ${done}/${total}${done>=total&&total?" 🎉":""}</div>
+      <div class="bar"><i style="width:${total?Math.round(done/total*100):0}%"></i></div>
+      ${next?`<div class="small" style="margin-top:4px">Próximo: <b style="color:var(--ink)">${esc(next.t)}</b>${next.y?` (${esc(next.y)})`:""}</div>`:""}</div></button>`; }).join("")}</div>`;
+  // rostos conhecidos
+  h += `<div class="sec">🔁 Rostos conhecidos</div><div id="faces"><div class="small">Analisando o que vocês já assistiram…</div></div>`;
+  return h;
+}
+function wirePeopleView(){
+  const q = $("#pq"); if (!q) return;
+  let t, seq = 0;
+  const run = async ()=>{
+    const s = q.value.trim(); S.pq = s; const box = $("#presults");
+    if (s.length < 2){ box.innerHTML = ""; return; }
+    if (!TMDB.ok()){ box.innerHTML = `<div class="small">Configure a chave do TMDB.</div>`; return; }
+    const my = ++seq; box.innerHTML = `<div class="small">Buscando…</div>`;
+    try {
+      const d = await TMDB.get("/search/person", { query:s, include_adult:"false" }); if (my!==seq) return;
+      const rs = (d.results||[]).filter(r=>r.known_for_department==="Acting"||r.known_for_department==="Directing").sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0,8);
+      box.innerHTML = rs.length ? `<div class="results">${rs.map(r=>`<button class="res big" data-person="${r.id}"><span class="pface">${profImg(r.profile_path)}</span>
+        <span style="min-width:0;flex:1"><b>${esc(r.name)}</b><span class="meta">${r.known_for_department==="Directing"?"Direção":"Atuação"}</span>
+        <span class="ov">${esc((r.known_for||[]).map(k=>k.title||k.name).filter(Boolean).slice(0,3).join(", "))}</span></span></button>`).join("")}</div>` : `<div class="small">Ninguém encontrado.</div>`;
+    } catch(_){ if (my===seq) box.innerHTML = `<div class="small">Não consegui buscar agora.</div>`; }
+  };
+  q.oninput = ()=>{ clearTimeout(t); t = setTimeout(run, 300); };
+  if (q.value.trim().length >= 2) run();
+  computeFaces();
+}
+let facesBusy = false;
+async function computeFaces(){
+  const box = $("#faces"); if (!box) return;
+  const watched = S.items.filter(i=>i.kind==="watch" && i.status==="done" && i.tmdbId);
+  const sig = watched.map(i=>i.tmdbType+i.tmdbId).sort().join(",");
+  if (S.facesSig === sig && S.faces){ drawFaces(box); return; }
+  if (!watched.length){ box.innerHTML = `<div class="small">Quando vocês tiverem filmes e séries assistidos, aparece aqui quem está em vários deles.</div>`; return; }
+  if (!TMDB.ok() || facesBusy) return;
+  facesBusy = true;
+  try {
+    const queue = watched.slice(0, 200); let i = 0;
+    const worker = async ()=>{ while (i < queue.length){ const it = queue[i++]; try { await creditsOf(it.tmdbType, it.tmdbId); } catch(_){} } };
+    await Promise.all([1,2,3,4,5,6].map(worker));
+    const map = {};
+    for (const it of watched){
+      const c = credCache.get(it.tmdbType+it.tmdbId); if (!c) continue;
+      const add = (pid, name, prof, role) => { const m = map[pid] = map[pid] || { id:pid, name, prof, items:[], roles:new Set() }; if (!m.items.some(x=>x.id===it.id)) m.items.push(it); m.roles.add(role); };
+      c.c.forEach(([pid,n,pr])=>add(pid,n,pr,"cast")); c.d.forEach(([pid,n,pr])=>add(pid,n,pr,"dir"));
+    }
+    S.faces = Object.values(map).filter(m=>m.items.length>=2).sort((a,b)=>b.items.length-a.items.length).slice(0,15);
+    S.facesSig = sig;
+  } finally { facesBusy = false; }
+  const b2 = $("#faces"); if (b2) drawFaces(b2);
+}
+function drawFaces(box){
+  if (!S.faces.length){ box.innerHTML = `<div class="small">Ainda ninguém aparece em mais de um dos filmes que vocês viram. Continuem assistindo 🍿</div>`; return; }
+  box.innerHTML = `<div class="list" style="margin-top:0">${S.faces.map(f=>`<button class="row" data-person="${f.id}"><div class="pface">${profImg(f.prof)}</div><div class="body">
+    <div class="title">${esc(f.name)}</div><div class="meta">${f.roles.has("dir")&&!f.roles.has("cast")?"Dirigiu":"Está em"} <b style="color:var(--accent)">${f.items.length}</b> dos que vocês viram</div>
+    <div class="note">${f.items.slice(0,4).map(i=>esc(i.title)).join(", ")}${f.items.length>4?"…":""}</div></div></button>`).join("")}</div>`;
+}
+
+async function openPerson(id){
+  openSheet(`<div class="small" style="padding:40px;text-align:center">Carregando…</div>`);
+  let p; try { p = await TMDB.person(id); } catch(_){ return openSheet(`<div class="small" style="padding:40px;text-align:center">Não consegui carregar agora.</div>`); }
+  const castN = personWorks(p,"cast",false).length, crewN = personWorks(p,"crew",false).length;
+  const st = { mode: (p.known_for_department==="Directing" && crewN) || !castN ? "crew" : "cast", tv:false, order:"year" };
+  const age = p.birthday ? Math.floor(((p.deathday?new Date(p.deathday):new Date()) - new Date(p.birthday)) / 31557600000) : null;
+  const draw = ()=>{
+    const ws = sortWorks(personWorks(p, st.mode, st.tv), st.order);
+    const valid = ws.filter(w=>!w.soon), done = valid.filter(w=>workStatus(w)==="done").length, inList = valid.filter(w=>workStatus(w)==="list").length;
+    const mara = S.marathons.find(m=>m.personId===id && m.mode===st.mode);
+    openSheet(`<div style="display:flex;gap:14px;align-items:center;margin-bottom:12px"><div class="pface big">${profImg(p.profile_path,"w342")}</div>
+      <div style="min-width:0"><h2 style="margin:0 0 4px">${esc(p.name)}</h2><div class="meta">${[p.known_for_department==="Directing"?"Direção":"Atuação", age!=null?`${age} anos${p.deathday?" (†)":""}`:"", p.place_of_birth].filter(Boolean).map(esc).join(" · ")}</div></div></div>
+      ${p.biography?`<div class="overview bio" id="bio">${esc(p.biography)}</div><button class="small" id="bioMore" style="text-decoration:underline;margin:4px 0 0">ver mais</button>${p.bioEn?`<div class="attr">bio em inglês (não tem em português no TMDB)</div>`:""}`:""}
+      <div class="card" style="margin-top:14px"><b style="font-size:17px">Vocês viram ${done} de ${valid.length}</b>${inList?` <span class="small">· ${inList} na lista</span>`:""}
+        <div class="bar"><i style="width:${valid.length?Math.round(done/valid.length*100):0}%"></i></div></div>
+      <div class="btns" style="margin:10px 0 4px">${mara ? `<button class="btn p" id="pmGo">🏁 Ver maratona</button>` : `<button class="btn p" id="pmNew">🏁 Começar maratona</button>`}</div>
+      <div class="seg">${castN&&crewN?`<button class="chip ${st.mode==="cast"?"on":""}" data-pm="cast">Atuação (${castN})</button><button class="chip ${st.mode==="crew"?"on":""}" data-pm="crew">Direção (${crewN})</button>`:""}
+        <button class="chip ${st.order==="year"?"on":""}" data-po="year">Por ano</button><button class="chip ${st.order==="popular"?"on":""}" data-po="popular">Mais famosos</button>
+        <button class="chip ${st.tv?"on":""}" data-ptv>📺 Incluir séries</button></div>
+      <div class="list">${ws.map(w=>{ const s = workStatus(w);
+        return `<div class="row work"><button class="wopen" data-w="${w.type}:${w.id}">${w.p?`<img src="${IMG}w154${esc(w.p)}" alt="" loading="lazy">`:`<span class="noimg"></span>`}</button>
+          <button class="body wopen" data-w="${w.type}:${w.id}" style="text-align:left"><div class="title" style="font-size:15px">${esc(w.t)}</div>
+            <div class="meta">${[w.y||"sem data", w.type==="tv"?"Série":"", w.ch].filter(Boolean).map(esc).join(" · ")}</div>
+            ${w.soon?`<span class="tag" style="margin-top:4px">em breve</span>`:""}</button>
+          ${s==="done"?`<span class="wst done">✓</span>`:s==="list"?`<span class="wst">📋</span>`:w.soon?"":`<button class="wst add" data-wadd="${w.type}:${w.id}">＋</button>`}</div>`; }).join("") || `<div class="small">Nada encontrado.</div>`}</div>
+      <p class="small" style="margin-top:10px">✓ assistido · 📋 já está numa lista · ＋ adicionar pra vocês verem juntos</p>`, root=>{
+      const bm = root.querySelector("#bioMore"); bm && (bm.onclick = ()=>{ root.querySelector("#bio").classList.toggle("open"); bm.textContent = root.querySelector("#bio").classList.contains("open") ? "ver menos" : "ver mais"; });
+      root.querySelectorAll("[data-pm]").forEach(b=>b.onclick=()=>{ st.mode=b.dataset.pm; draw(); });
+      root.querySelectorAll("[data-po]").forEach(b=>b.onclick=()=>{ st.order=b.dataset.po; draw(); });
+      root.querySelector("[data-ptv]").onclick = ()=>{ st.tv=!st.tv; draw(); };
+      root.querySelectorAll(".wopen").forEach(b=>b.onclick=()=>{ const [t,i]=b.dataset.w.split(":"); openTmdbThing(t, +i); });
+      root.querySelectorAll("[data-wadd]").forEach(b=>b.onclick=async ()=>{ const [t,i]=b.dataset.wadd.split(":"); b.disabled=true; b.textContent="…";
+        try { const d = await TMDB.details(t, +i); await addFromTmdb(t, d, "both"); b.outerHTML = `<span class="wst">📋</span>`; } catch(err){ b.disabled=false; b.textContent="＋"; writeErr(err); } });
+      root.querySelector("#pmGo") && (root.querySelector("#pmGo").onclick = ()=>openMarathon(mara.id));
+      root.querySelector("#pmNew") && (root.querySelector("#pmNew").onclick = ()=>openMarathonSetup(p, st, ws));
+    });
+  };
+  draw();
+}
+function openMarathonSetup(p, pst, ws){
+  const st = { order: pst.order, tv: pst.tv, folder: true };
+  openSheet(`<h2>🏁 Maratona ${esc(p.name)}</h2>
+    <p class="small" style="margin-top:-6px">${pst.mode==="crew"?"Todos os filmes que dirigiu":"Todos os filmes em que atuou"}${st.tv?" e séries":""} — ${ws.filter(w=>!w.soon).length} títulos (os que ainda não lançaram ficam de fora da conta).</p>
+    <div class="field"><label>Ordem</label>${chipsInput("mo", [["year","📅 Do mais antigo pro mais novo"],["popular","⭐ Mais famosos primeiro"]], st.order)}</div>
+    <div class="field"><label>Pasta</label><div class="chips"><button type="button" class="chip on" id="mfold">📁 Criar pasta com os filmes</button></div></div>
+    <div class="btns"><button class="btn p" id="mGo">Começar maratona</button><button class="btn g" id="mX">Cancelar</button></div>`, root=>{
+    wireChips(root); root.querySelector('[data-chips="mo"]').setAttribute("data-req","");
+    root.querySelector("#mfold").onclick = e=>{ st.folder=!st.folder; e.currentTarget.classList.toggle("on", st.folder); };
+    root.querySelector("#mX").onclick = ()=>openPerson(p.id);
+    root.querySelector("#mGo").onclick = async e=>{
+      e.target.disabled = true;
+      const order = chipVal(root,"mo")||"year";
+      const list = ws.map(w=>({ id:w.id, type:w.type, t:w.t, y:w.y, date:w.date, p:w.p, pop:w.pop, ch:w.ch, soon:w.soon }));
+      try {
+        let folderId = null;
+        if (st.folder){
+          const entries = sortWorks(list.filter(w=>!w.soon), order).map(w=>({ key:w.type+w.id, tmdbId:w.id, type:w.type, itemId:null, title:w.t, poster:w.p, cover:"" }));
+          const ref = await API.add("folders", { name:`Maratona ${p.name}`, emoji:"🏁", entries, createdBy:S.me, createdAt:Date.now() });
+          folderId = ref && ref.id;
+        }
+        const ref = await API.add("marathons", { personId:p.id, name:p.name, photo:p.profile_path||"", mode:pst.mode, order, includeTv:pst.tv, list, folderId, createdBy:S.me, createdAt:Date.now() });
+        toast("Maratona começou 🏁");
+        if (ref && ref.id){ S.marathons.push({ id:ref.id, personId:p.id, name:p.name, photo:p.profile_path||"", mode:pst.mode, order, list, folderId }); openMarathon(ref.id); } else closeSheet();
+      } catch(err){ e.target.disabled=false; writeErr(err); }
+    };
+  });
+}
+function openMarathon(mid){
+  const m = S.marathons.find(x=>x.id===mid); if (!m) return closeSheet();
+  const ws = sortWorks((m.list||[]).filter(w=>!w.soon), m.order);
+  const done = ws.filter(w=>workStatus(w)==="done").length, next = ws.find(w=>workStatus(w)!=="done");
+  openSheet(`<div style="display:flex;gap:14px;align-items:center;margin-bottom:12px"><div class="pface big">${profImg(m.photo,"w342")}</div>
+      <div><h2 style="margin:0 0 4px">🏁 ${esc(m.name)}</h2><div class="meta">${m.mode==="crew"?"Filmes que dirigiu":"Filmes em que atuou"} · ${m.order==="popular"?"mais famosos primeiro":"ordem de lançamento"}</div></div></div>
+    <div class="card"><b style="font-size:18px">${done} de ${ws.length}</b> <span class="small">${done>=ws.length&&ws.length?"— maratona completa! 🎉":"assistidos"}</span><div class="bar"><i style="width:${ws.length?Math.round(done/ws.length*100):0}%"></i></div></div>
+    ${next?`<div class="sec">Próximo</div><button class="row" data-w="${next.type}:${next.id}" style="border-color:var(--accent)">${next.p?`<div class="cover"><img src="${IMG}w185${esc(next.p)}" alt=""></div>`:""}<div class="body"><div class="title">${esc(next.t)}</div><div class="meta">${esc([next.y, next.ch].filter(Boolean).join(" · "))}</div><div class="small">Toque pra ver onde assistir</div></div></button>`:""}
+    <div class="btns h" style="margin-top:10px"><button class="btn g" id="mRoll">🎲 Sortear um que falta</button>${m.folderId && S.folders.find(f=>f.id===m.folderId)?`<button class="btn g" id="mFolder">📁 Pasta</button>`:""}</div>
+    <div class="sec">Todos</div><div class="list" style="margin-top:0">${ws.map((w,i)=>{ const s = workStatus(w);
+      return `<div class="row work ${s==="done"?"seen":""}"><span class="wn">${i+1}</span><button class="body wopen" data-w="${w.type}:${w.id}" style="text-align:left"><div class="title" style="font-size:15px">${esc(w.t)}</div><div class="meta">${esc([w.y, w.ch].filter(Boolean).join(" · "))}</div></button>
+        ${s==="done"?`<span class="wst done">✓</span>`:s==="list"?`<span class="wst">📋</span>`:`<button class="wst add" data-wadd="${w.type}:${w.id}">＋</button>`}</div>`; }).join("")}</div>
+    <div class="btns" style="margin-top:14px"><button class="btn g" id="mPerson">🎭 Ver ${esc(m.name)}</button><button class="btn g d" id="mEnd">Encerrar maratona</button></div>`, root=>{
+    root.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{ const [t,i]=b.dataset.w.split(":"); openTmdbThing(t, +i); });
+    root.querySelectorAll("[data-wadd]").forEach(b=>b.onclick=async ()=>{ const [t,i]=b.dataset.wadd.split(":"); b.disabled=true; b.textContent="…";
+      try { const d = await TMDB.details(t, +i); await addFromTmdb(t, d, "both"); b.outerHTML = `<span class="wst">📋</span>`; } catch(err){ b.disabled=false; b.textContent="＋"; writeErr(err); } });
+    root.querySelector("#mRoll").onclick = ()=>{ const left = ws.filter(w=>workStatus(w)!=="done"); if (!left.length) return toast("Já viram todos 🎉"); const w = left[Math.floor(Math.random()*left.length)]; toast(`🎲 ${w.t}`); openTmdbThing(w.type, w.id); };
+    root.querySelector("#mFolder") && (root.querySelector("#mFolder").onclick = ()=>openFolder(m.folderId));
+    root.querySelector("#mPerson").onclick = ()=>openPerson(m.personId);
+    root.querySelector("#mEnd").onclick = ()=>{ const ov = overlaySheet(`<h2>Encerrar a maratona ${esc(m.name)}?</h2><p class="small">Os filmes continuam nas listas e na pasta.</p><div class="btns"><button class="btn p" id="meY" style="background:#ff6b6b">Encerrar</button><button class="btn g" id="meN">Cancelar</button></div>`);
+      ov.querySelector("#meN").onclick = ()=>ov.remove();
+      ov.querySelector("#meY").onclick = async ()=>{ try { await API.del("marathons/"+m.id); ov.remove(); toast("Maratona encerrada"); closeSheet(); } catch(err){ writeErr(err); } }; };
+  });
+}
+// elenco no detalhe
+function castHTML(d, it){
+  const v = credCache.fromCredits(d.credits); if (it && it.tmdbId) credCache.set(it.tmdbType+it.tmdbId, v);
+  const people = [...v.d.map(x=>({ id:x[0], n:x[1], pr:x[2], r:"Direção" })), ...v.c.slice(0,10).map(x=>({ id:x[0], n:x[1], pr:x[2], r:x[3] }))];
+  if (!people.length) return "";
+  const others = S.items.filter(i=>i.status==="done" && i.tmdbId && i.id!==(it&&it.id));
+  const alsoIn = [];
+  for (const pp of people){ const titles = others.filter(o=>{ const c = credCache.get(o.tmdbType+o.tmdbId); return c && (c.c.some(x=>x[0]===pp.id) || c.d.some(x=>x[0]===pp.id)); }).map(o=>o.title);
+    if (titles.length) alsoIn.push(`<b>${esc(pp.n)}</b> ${pp.r==="Direção"?"também dirigiu":"também está em"} ${esc(titles.slice(0,3).join(", "))}${titles.length>3?"…":""}`); if (alsoIn.length>=2) break; }
+  return `<div class="sec">Elenco e direção</div><div class="castrow">${people.map(pp=>`<button data-person="${pp.id}"><span class="pface">${profImg(pp.pr)}</span><b>${esc(pp.n)}</b><span>${esc(pp.r||"")}</span></button>`).join("")}</div>
+    ${alsoIn.length?`<div class="small" style="margin-top:6px">👀 ${alsoIn.join(" · ")}</div>`:""}`;
+}
+document.addEventListener("click", e=>{ const b = e.target.closest("[data-person]"); if (b && !e.defaultPrevented){ e.preventDefault(); openPerson(+b.dataset.person); } });
+
 // ---------- ajustes ----------
 function openName(force){
   S.mustName = force;
@@ -1765,6 +2007,7 @@ function writeErr(err){
 // =============== eventos ===============
 $("#nav").addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
+  try { document.activeElement && document.activeElement.blur(); } catch(_){}
   S.tab=b.dataset.tab; S.q=""; try{ history.replaceState(null,"","#"+S.tab); }catch(_){}
   window.scrollTo(0,0); render();
 });
@@ -1778,6 +2021,7 @@ $("#view").addEventListener("click", e=>{
   const pc=e.target.closest("[data-profile]"); if(pc) return openProfile(pc.dataset.profile);
   const fc=e.target.closest("[data-folder]"); if(fc) return openFolder(fc.dataset.folder);
   if (id==="folderNew") return openFolderNew();
+  const mc=e.target.closest("[data-mara]"); if(mc) return openMarathon(mc.dataset.mara);
   if (id==="needBtn"){ S.needOnly = !S.needOnly; return render(); }
   if (id==="matchBtn") return openMatch(S.tab==="series"?"tv":"movie");
   if (id==="rollBtn") openRoll();
@@ -1891,6 +2135,7 @@ function showSplash(){
       render();
     }, onErr));
     unsubs.push(API.watch("match", docs=>{ S.match = {}; docs.forEach(d=>S.match[d.id]=d); if (S.matchView) S.matchView(); render(); newsTick(); }, onErr));
+    unsubs.push(API.watch("marathons", docs=>{ S.marathons = docs; if (S.tab==="people") render(); newsTick(); }, onErr));
     unsubs.push(API.watch("folders", docs=>{ S.folders = docs; render(); newsTick(); }, onErr));
     unsubs.push(API.watch("goals", docs=>{ S.goals = docs.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); render(); }, onErr));
     unsubs.push(API.watch("items", docs=>{
