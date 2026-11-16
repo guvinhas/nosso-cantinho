@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="20">
+<meta name="app-version" content="21">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -243,7 +243,11 @@ nav button{min-width:56px;padding:4px 2px}
 .filtpanel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px 12px;margin:8px 0 4px;animation:up .15s ease-out}
 .filtpanel .chips .chip{font-size:13px;padding:6px 12px}
 .flabel{font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.4px;margin:6px 0 6px}
-.toast{position:fixed;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:500;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.followrow{display:flex;gap:12px;overflow-x:auto;padding:4px 0}
+.fchip{position:relative;flex:none;width:64px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;text-align:center;line-height:1.15}
+.fchip .pface{margin:0 auto}
+.row.work{position:relative}
+.toast{position:fixed;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:500;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
 .toast.show{opacity:1}
 #auth{display:none;max-width:420px;margin:0 auto;padding-top:8vh}
 #auth .logo{font-size:56px;text-align:center}
@@ -296,7 +300,7 @@ nav button{min-width:56px;padding:4px 2px}
 <nav id="nav" style="display:none">
   <button data-tab="movies"><span class="i">🎬</span>Filmes</button>
   <button data-tab="series"><span class="i">📺</span>Séries</button>
-  <button data-tab="people"><span class="i">🎭</span>Pessoas</button>
+  <button data-tab="people"><span class="i">🔭</span>Explorar</button>
   <button data-tab="places"><span class="i">📍</span>Lugares</button>
   <button data-tab="us"><span class="i">💛</span>Nós</button>
 </nav>
@@ -323,7 +327,7 @@ const S = {
   filter: { movies:"forme", series:"forme", places:"todo" },
   genre: { movies:"", series:"" },
   q: "", year: new Date().getFullYear(),
-  items: [], people: {}, settings: {}, goals: [], folders: [], match: {}, marathons: [], faces: null, usSeg: "us", visited: new Set(), toasted: new Set(),
+  items: [], people: {}, settings: {}, goals: [], folders: [], match: {}, marathons: [], faces: null, follows: [], exSeg: "rel", usSeg: "us", visited: new Set(), toasted: new Set(),
   me: null, email: "", loaded: false, splashed: false
 };
 const $ = s => document.querySelector(s);
@@ -569,13 +573,13 @@ function render(){
   if (S.tab==="people" && document.activeElement && document.activeElement.id==="pq" && $("#pq")) return; // não atrapalhar quem está digitando
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===S.tab));
   if (S.newsReady) S.visited.add(S.tab);
-  $("#pageTitle").textContent = {movies:"Filmes", series:"Séries", people:"Pessoas", places:"Lugares", us:"Nós dois"}[S.tab];
+  $("#pageTitle").textContent = {movies:"Filmes", series:"Séries", people:"Explorar", places:"Lugares", us:"Nós dois"}[S.tab];
   const o = other(), st = S.settings;
   $("#hello").textContent = st.title || (o ? `${nameRaw(S.me)} & ${nameRaw(o)}` : `Oi, ${nameRaw(S.me)}`);
   const av = $("#hdrAv"); if (st.photo){ av.src = st.photo; av.style.display="block"; } else av.style.display="none";
   const v = $("#view");
-  v.innerHTML = S.tab==="movies"||S.tab==="series" ? viewWatch(S.tab) : S.tab==="people" ? viewPeople() : S.tab==="places" ? viewPlaces() : viewUs();
-  if (S.tab==="people") wirePeopleView();
+  v.innerHTML = S.tab==="movies"||S.tab==="series" ? viewWatch(S.tab) : S.tab==="people" ? (segHTML([["rel","📅 Lançamentos"],["people","🎭 Pessoas"]], S.exSeg, "ex") + (S.exSeg==="people" ? viewPeople() : viewReleases())) : S.tab==="places" ? viewPlaces() : viewUs();
+  if (S.tab==="people"){ if (S.exSeg==="people") wirePeopleView(); else wireReleases(); }
   const si = $("#q"); if (si){ si.value=S.q; si.oninput=e=>{ S.q=e.target.value; const p=e.target.selectionStart; render(); const n=$("#q"); n.focus(); try{n.setSelectionRange(p,p);}catch(_){} }; }
   $("#fab").style.display = S.tab==="us" || S.tab==="people" ? "none" : "flex";
   if (S.newsReady) renderBell();
@@ -1171,7 +1175,7 @@ function openDetail(id){
     const lp = root.querySelector("#liveProv");
     if (lp){
       if (!TMDB.ok()) lp.innerHTML = `<div class="small">Configure a chave do TMDB para ver.</div>`;
-      else TMDB.details(it.tmdbType, it.tmdbId).then(d=>{ lp.innerHTML = provsHTML(provsBR(d)); const tr = trailerHTML(d); if (tr) root.querySelector("#trBox").innerHTML = tr; const cb = root.querySelector("#castBox"); if (cb) cb.innerHTML = castHTML(d, it); }).catch(()=>{ lp.innerHTML = `<div class="small">Não consegui buscar agora.</div>`; });
+      else TMDB.details(it.tmdbType, it.tmdbId).then(d=>{ lp.innerHTML = provsHTML(provsBR(d)); const tr = trailerHTML(d); if (tr) root.querySelector("#trBox").innerHTML = tr; const cb = root.querySelector("#castBox"); if (cb) cb.innerHTML = followCollBtn(d) + castHTML(d, it); }).catch(()=>{ lp.innerHTML = `<div class="small">Não consegui buscar agora.</div>`; });
     }
   });
 }
@@ -1474,7 +1478,7 @@ async function openTmdbThing(tt, id){
         <h2>${esc(d.title||d.name)}</h2><div class="meta">${[tt==="tv"?"Série":"Filme", (d.release_date||d.first_air_date||"").slice(0,4), (d.genres||[]).slice(0,3).map(g=>g.name).join(", ")].filter(Boolean).map(esc).join(" · ")}</div>
         ${d.vote_average?`<div class="small" style="margin-top:6px">★ ${d.vote_average.toFixed(1)} no TMDB</div>`:""}</div></div>
       ${d.overview?`<div class="sec">Sinopse</div><div class="overview">${esc(d.overview)}</div>`:""}
-      ${trailerHTML(d)}${castHTML(d, null)}<div class="sec">Onde assistir no Brasil</div>${provsHTML(p)}
+      ${trailerHTML(d)}${followCollBtn(d)}${castHTML(d, null)}<div class="sec">Onde assistir no Brasil</div>${provsHTML(p)}
       <div class="field" style="margin-top:14px"><label>Adicionar em</label>${chipsInput("pfor", [["both","💑 Juntos"],["self","🙋 Eu quero ver"],["other","💌 Pra "+pName()]], "both")}</div>
       <div class="btns"><button class="btn p" id="pAdd">➕ Adicionar à lista</button><button class="btn g" id="pX">Fechar</button></div>`, root=>{
       wireChips(root); root.querySelector('[data-chips="pfor"]').setAttribute("data-req","");
@@ -1589,7 +1593,7 @@ const tabOf = it => it.kind==="place" ? "places" : it.mediaType==="serie" ? "ser
 const isNew = it => S.prevSeen && it.createdBy && it.createdBy!==S.me && (it.createdAt||0) > S.prevSeen;
 function agoTxt(ms){ const m=Math.round((Date.now()-ms)/60000); if(m<1) return "agora"; if(m<60) return `${m} min`; const h=Math.round(m/60); if(h<24) return `${h} h`; const d=Math.round(h/24); return d===1?"ontem":`${d} dias`; }
 function buildEvents(since){
-  const o = other(); if (!o) return [];
+  const o = other() || "__ninguem__";
   const on = esc(nameRaw(o)), ev = [];
   for (const it of S.items){
     const t = `<b>${esc(it.title)}</b>`, place = it.kind==="place", w = it.mediaType==="serie" ? "a série" : "o filme";
@@ -1619,6 +1623,8 @@ function buildEvents(since){
   }
   for (const [tt, m] of Object.entries(S.match)) if (m && m.createdBy===o && (m.createdAt||0) > since)
     ev.push({ key:"m"+tt+m.createdAt, at:m.createdAt, match:tt, icon:"🤝", tab: tt==="tv"?"series":"movies", txt: `${on} começou uma rodada do <b>Topa?</b> de ${tt==="tv"?"séries":"filmes"} — bora votar!` });
+  for (const r of (S.relList||[])){ const ts = relDate(r); if (ts && ts > since && ts <= Date.now() && relStatus(r)!=="done")
+    ev.push({ key:"rel"+r.id, at:ts, rel:r.id, icon:"🎬", tab:"people", txt: `Estreou: <b>${esc(r.t)}</b> (${esc(r.why[0]||"")})` }); }
   for (const m of S.marathons) if (m.createdBy===o && (m.createdAt||0) > since)
     ev.push({ key:"mr"+m.id, at:m.createdAt, mara:m.id, icon:"🏁", tab:"people", txt: `${on} começou a <b>maratona ${esc(m.name)}</b>` });
   for (const f of S.folders) if (f.createdBy===o && (f.createdAt||0) > since)
@@ -1650,8 +1656,8 @@ function openNews(auto){
   openSheet(`<h2>✨ Novidades</h2>
     ${!o ? `<div class="small">Quando ${esc(pName())} entrar no app, o que ele(a) fizer aparece aqui.</div>` :
       !list.length ? emptyHTML("🍃", `Nada novo de ${esc(nameRaw(o))} nos últimos dias.`) :
-      `<div class="list" style="margin-top:0">${list.map(e=>`<button class="row news ${fresh.has(e.key)?"fresh":""}" ${e.it?`data-nopen="${esc(e.it.id)}"`:e.folder?`data-nfolder="${esc(e.folder)}"`:e.match?`data-nmatch="${e.match}"`:e.mara?`data-nmara="${esc(e.mara)}"`:""}>
-        ${e.it ? coverHTML(e.it) : `<div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:30px;aspect-ratio:1/1">${e.icon}</div>`}
+      `<div class="list" style="margin-top:0">${list.map(e=>`<button class="row news ${fresh.has(e.key)?"fresh":""}" ${e.it?`data-nopen="${esc(e.it.id)}"`:e.folder?`data-nfolder="${esc(e.folder)}"`:e.match?`data-nmatch="${e.match}"`:e.mara?`data-nmara="${esc(e.mara)}"`:e.rel?`data-nrel="${e.rel}"`:""}>
+        ${e.it ? coverHTML(e.it) : e.rel ? (()=>{ const r=(S.relList||[]).find(x=>x.id===e.rel); return r&&r.p?`<div class="cover"><img src="${IMG}w154${esc(r.p)}" alt=""></div>`:`<div class="cover"></div>`; })() : `<div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:30px;aspect-ratio:1/1">${e.icon}</div>`}
         <div class="body"><div style="font-size:14px;line-height:1.35">${e.it?e.icon+" ":""}${e.txt}</div>
           ${e.quote?`<div class="note">“${esc(e.quote)}”</div>`:""}
           <div class="meta">${agoTxt(e.at)}${fresh.has(e.key)?` · <span style="color:var(--accent);font-weight:600">novo</span>`:""}</div></div></button>`).join("")}</div>`}
@@ -1661,6 +1667,7 @@ function openNews(auto){
     root.querySelectorAll("[data-nopen]").forEach(b=>b.onclick=()=>{ markSeen(); openDetail(b.dataset.nopen); });
     root.querySelectorAll("[data-nfolder]").forEach(b=>b.onclick=()=>{ markSeen(); openFolder(b.dataset.nfolder); });
     root.querySelectorAll("[data-nmatch]").forEach(b=>b.onclick=()=>{ markSeen(); openMatch(b.dataset.nmatch); });
+    root.querySelectorAll("[data-nrel]").forEach(b=>b.onclick=()=>{ markSeen(); openTmdbThing("movie", +b.dataset.nrel); });
     root.querySelectorAll("[data-nmara]").forEach(b=>b.onclick=()=>{ markSeen(); openMarathon(b.dataset.nmara); });
   });
 }
@@ -1672,6 +1679,7 @@ function newsTick(){
   renderBell();
 }
 function startNews(){
+  setTimeout(checkReleasesBg, 2500);
   if (S.newsReady) return;
   const me = S.people[S.me] || {};
   S.newsReady = true;
@@ -1984,7 +1992,7 @@ async function openPerson(id){
       ${p.biography?`<div class="overview bio" id="bio">${esc(p.biography)}</div><button class="small" id="bioMore" style="text-decoration:underline;margin:4px 0 0">ver mais</button>${p.bioEn?`<div class="attr">bio em inglês (não tem em português no TMDB)</div>`:""}`:""}
       <div class="card" style="margin-top:14px"><b style="font-size:17px">Vocês viram ${done} de ${valid.length}</b>${inList?` <span class="small">· ${inList} na lista</span>`:""}
         <div class="bar"><i style="width:${valid.length?Math.round(done/valid.length*100):0}%"></i></div></div>
-      <div class="btns" style="margin:10px 0 4px">${mara ? `<button class="btn p" id="pmGo">🏁 Ver maratona</button>` : `<button class="btn p" id="pmNew">🏁 Começar maratona</button>`}</div>
+      <div class="btns h" style="margin:10px 0 4px">${mara ? `<button class="btn p" id="pmGo">🏁 Ver maratona</button>` : `<button class="btn p" id="pmNew">🏁 Começar maratona</button>`}<button class="btn g" id="pmFol">${isFollowing("person", id)?"✓ Seguindo":"⭐ Seguir"}</button></div>
       <div class="seg">${castN&&crewN?`<button class="chip ${st.mode==="cast"?"on":""}" data-pm="cast">Atuação (${castN})</button><button class="chip ${st.mode==="crew"?"on":""}" data-pm="crew">Direção (${crewN})</button>`:""}
         <button class="chip ${st.order==="year"?"on":""}" data-po="year">Por ano</button><button class="chip ${st.order==="popular"?"on":""}" data-po="popular">Mais famosos</button>
         <button class="chip ${st.tv?"on":""}" data-ptv>📺 Incluir séries</button></div>
@@ -2004,6 +2012,7 @@ async function openPerson(id){
         try { const d = await TMDB.details(t, +i); await addFromTmdb(t, d, "both"); b.outerHTML = `<span class="wst">📋</span>`; } catch(err){ b.disabled=false; b.textContent="＋"; writeErr(err); } });
       root.querySelector("#pmGo") && (root.querySelector("#pmGo").onclick = ()=>openMarathon(mara.id));
       root.querySelector("#pmNew") && (root.querySelector("#pmNew").onclick = ()=>openMarathonSetup(p, st, ws));
+      root.querySelector("#pmFol").onclick = async e=>{ try { await toggleFollow("person", id, p.name, p.profile_path); e.target.textContent = isFollowing("person", id) ? "✓ Seguindo" : "⭐ Seguir"; } catch(err){ writeErr(err); } };
     });
   };
   draw();
@@ -2073,6 +2082,124 @@ function castHTML(d, it){
     ${alsoIn.length?`<div class="small" style="margin-top:6px">👀 ${alsoIn.join(" · ")}</div>`:""}`;
 }
 document.addEventListener("click", e=>{ const b = e.target.closest("[data-person]"); if (b && !e.defaultPrevented){ e.preventDefault(); openPerson(+b.dataset.person); } });
+
+// =============== 📅 lançamentos ===============
+const isFollowing = (type, id) => S.follows.some(f=>f.type===type && f.tmdbId===id);
+async function toggleFollow(type, id, name, img){
+  const key = type+"_"+id;
+  if (isFollowing(type, id)){ await API.del("follows/"+key); S.follows = S.follows.filter(f=>!(f.type===type&&f.tmdbId===id)); toast("Deixou de seguir"); }
+  else { const d = { type, tmdbId:id, name, img:img||"", createdBy:S.me, createdAt:Date.now() }; await API.set("follows/"+key, d); S.follows.push({ id:key, ...d }); toast(`Seguindo ${name} 🔔`); }
+  try { localStorage.removeItem("cantinho_rel"); } catch(_){}
+  S.relList = null;
+}
+const cleanColl = n => (n||"").replace(/\s*[-–:]?\s*(Coleção|Collection|Saga|Franquia)\s*$/i,"").replace(/^(Coleção|Collection)\s*/i,"").trim();
+TMDB.collection = async function(id){ const k="coll"+id; if (this._cache[k]) return this._cache[k]; return this._cache[k] = await this.get(`/collection/${id}`); };
+function followSources(){
+  const list = S.follows.map(f=>({ type:f.type, id:f.tmdbId, name:f.name }));
+  for (const m of S.marathons) if (!list.some(x=>x.type==="person"&&x.id===m.personId)) list.push({ type:"person", id:m.personId, name:m.name, auto:true });
+  return list;
+}
+const dayMs = 86400000;
+const relDate = r => r.date ? new Date(r.date+"T12:00:00").getTime() : null;
+async function loadReleases(force){
+  const src = followSources(); if (!src.length) return [];
+  const sig = src.map(s=>s.type+s.id).sort().join(",");
+  let cached = null; try { cached = JSON.parse(localStorage.getItem("cantinho_rel")||"null"); } catch(_){}
+  if (!force && cached && cached.sig===sig && Date.now()-cached.at < 6*3600000) return cached.list;
+  const today = Date.now(), map = {};
+  const add = (m, why) => {
+    if (!m || m.video || (m.media_type && m.media_type!=="movie")) return;
+    const date = m.release_date || "";
+    const ts = date ? new Date(date+"T12:00:00").getTime() : null;
+    if (ts && ts < today - 60*dayMs) return;               // só recentes ou futuros
+    if (!ts && (m.popularity||0) < 1.5) return;            // sem data: só se tiver algum movimento
+    const r = map[m.id] = map[m.id] || { id:m.id, t:m.title||m.name, date, p:m.poster_path||"", pop:m.popularity||0, why:[] };
+    if (!r.why.includes(why)) r.why.push(why);
+  };
+  let i = 0;
+  const worker = async ()=>{ while (i < src.length){ const s = src[i++]; try {
+    if (s.type==="person"){
+      const p = await TMDB.person(s.id), cc = p.combined_credits || {};
+      (cc.cast||[]).filter(c=>!SELF_RX.test(c.character||"")).forEach(c=>add(c, `com ${p.name}`));
+      (cc.crew||[]).filter(c=>c.job==="Director").forEach(c=>add(c, `dirigido por ${p.name}`));
+    } else {
+      const c = await TMDB.collection(s.id);
+      (c.parts||[]).forEach(m=>add(m, `franquia ${cleanColl(c.name||s.name)}`));
+    }
+  } catch(_){} } };
+  await Promise.all([1,2,3,4].map(worker));
+  const list = Object.values(map);
+  try { localStorage.setItem("cantinho_rel", JSON.stringify({ sig, at:Date.now(), list })); } catch(_){}
+  return list;
+}
+function relStatus(r){ const it = S.items.find(i=>i.tmdbId===r.id && i.tmdbType==="movie"); return it ? (it.status==="done" ? "done" : "list") : ""; }
+function relCard(r){
+  const ts = relDate(r), now = Date.now(), s = relStatus(r);
+  const days = ts ? Math.round((ts - now)/dayMs) : null;
+  const when = !ts ? "Sem data ainda" : days > 0 ? `${fmtDate(ts)} · em ${days} ${days===1?"dia":"dias"}` : days===0 ? "Estreia hoje! 🎉" : `${fmtDate(ts)} · há ${-days} ${-days===1?"dia":"dias"}`;
+  return `<div class="row work">${ts && days<=0 && days>-15 ? `<span class="newtag" style="right:auto;left:8px;top:8px">SAIU!</span>`:""}
+    <button class="wopen" data-w="movie:${r.id}">${r.p?`<img src="${IMG}w154${esc(r.p)}" alt="" loading="lazy">`:`<span class="noimg"></span>`}</button>
+    <button class="body wopen" data-w="movie:${r.id}" style="text-align:left"><div class="title" style="font-size:15px">${esc(r.t)}</div>
+      <div class="meta" style="color:${ts&&days>0?"var(--accent)":"var(--mute)"}">📅 ${esc(when)}</div><div class="small">${esc(r.why.slice(0,2).join(" · "))}</div></button>
+    ${s==="done"?`<span class="wst done">✓</span>`:s==="list"?`<span class="wst">📋</span>`:`<button class="wst add" data-wadd="movie:${r.id}">＋</button>`}</div>`;
+}
+function viewReleases(){
+  const src = followSources();
+  let h = `<div class="sec" style="display:flex;justify-content:space-between;align-items:center">Seguindo <button class="chip" id="relManage">${S.relManage?"✓ Pronto":"✏️ Gerenciar"}</button></div>`;
+  h += src.length ? `<div class="followrow">${src.map(s=>{ const f = S.follows.find(x=>x.type===s.type&&x.tmdbId===s.id); const img = f ? f.img : (S.marathons.find(m=>m.personId===s.id)||{}).photo;
+      return `<span class="fchip">${s.type==="person"?`<button data-person="${s.id}" class="pface" style="width:46px;height:46px">${profImg(img)}</button>`:`<span class="pface" style="width:46px;height:46px;font-size:22px">🎞️</span>`}
+        <span>${esc(s.type==="collection"?cleanColl(s.name):s.name)}</span>${S.relManage && !s.auto ? `<button class="x" data-unf="${s.type}:${s.id}" style="top:-4px;right:2px">✕</button>`:""}${s.auto?`<i class="small" style="font-size:10px">maratona</i>`:""}</span>`; }).join("")}</div>`
+    : `<div class="small">Siga atores, diretores e franquias pra ver os lançamentos aqui. Abra uma pessoa (🎭 Pessoas) e toque em <b>⭐ Seguir</b>, ou busque uma franquia abaixo.</div>`;
+  h += `<div class="field" style="margin-top:12px"><input id="collq" placeholder="🔎 Seguir franquia (ex: Jogos Vorazes, Duna, Toy Story)…" autocomplete="off"></div><div id="collres"></div>`;
+  if (S.faces && S.faces.length){ const sug = S.faces.filter(f=>!isFollowing("person", f.id)).slice(0,6);
+    if (sug.length) h += `<div class="small" style="margin:4px 0 6px">Sugestões (rostos conhecidos):</div><div class="chips">${sug.map(f=>`<button class="chip" data-fol="${f.id}" data-fname="${esc(f.name)}" data-fimg="${esc(f.prof||"")}">＋ ${esc(f.name)}</button>`).join("")}</div>`; }
+  h += `<div id="relBox" style="margin-top:6px">${src.length ? `<div class="small" style="margin-top:14px">Procurando lançamentos…</div>` : ""}</div>`;
+  return h;
+}
+async function wireReleases(){
+  const cq = $("#collq");
+  if (cq){ let t, seq=0; cq.oninput = ()=>{ clearTimeout(t); const s=cq.value.trim(); const box=$("#collres"); if (s.length<2){ box.innerHTML=""; return; }
+    t = setTimeout(async ()=>{ const my=++seq; box.innerHTML=`<div class="small">Buscando…</div>`;
+      try { const d = await TMDB.get("/search/collection", { query:s }); if (my!==seq) return;
+        const rs = (d.results||[]).slice(0,6);
+        box.innerHTML = rs.length ? `<div class="results">${rs.map(c=>`<button class="res" data-coll="${c.id}" data-cname="${esc(c.name)}" data-cimg="${esc(c.poster_path||"")}">${c.poster_path?`<img src="${IMG}w92${esc(c.poster_path)}" alt="">`:`<span class="noimg"></span>`}<span style="flex:1"><b>${esc(cleanColl(c.name))}</b><span class="meta">${isFollowing("collection",c.id)?"✓ seguindo":"toque pra seguir"}</span></span></button>`).join("")}</div>` : `<div class="small">Nenhuma franquia com esse nome.</div>`;
+        box.querySelectorAll("[data-coll]").forEach(b=>b.onclick=async ()=>{ try { await toggleFollow("collection", +b.dataset.coll, b.dataset.cname, b.dataset.cimg); cq.value=""; render(); } catch(err){ writeErr(err); } });
+      } catch(_){ if (my===seq) box.innerHTML=`<div class="small">Não consegui buscar agora.</div>`; } }, 300); }; }
+  const box = $("#relBox"); if (!box || !followSources().length) return;
+  if (!TMDB.ok()){ box.innerHTML = `<div class="small">Configure a chave do TMDB.</div>`; return; }
+  const list = S.relList || (S.relList = await loadReleases());
+  const b2 = $("#relBox"); if (!b2) return;
+  const now = Date.now();
+  const soon = list.filter(r=>relDate(r) && relDate(r) > now - dayMs/2).sort((a,b)=>relDate(a)-relDate(b));
+  const nodate = list.filter(r=>!relDate(r)).sort((a,b)=>b.pop-a.pop).slice(0,12);
+  const recent = list.filter(r=>relDate(r) && relDate(r) <= now - dayMs/2).sort((a,b)=>relDate(b)-relDate(a));
+  let h = "";
+  if (soon.length) h += `<div class="sec">🗓️ Em breve (${soon.length})</div><div class="list" style="margin-top:0">${soon.map(relCard).join("")}</div>`;
+  if (recent.length) h += `<div class="sec">🍿 Saíram recentemente</div><div class="list" style="margin-top:0">${recent.map(relCard).join("")}</div>`;
+  if (nodate.length) h += `<div class="sec">🎬 Em produção (sem data)</div><div class="list" style="margin-top:0">${nodate.map(relCard).join("")}</div>`;
+  b2.innerHTML = h || emptyHTML("📭", "Nada anunciado pra quem vocês seguem por enquanto.");
+  b2.insertAdjacentHTML("beforeend", `<p class="small" style="margin-top:12px">Datas de estreia mundial (TMDB). <button id="relRefresh" style="text-decoration:underline;color:var(--ink)">Atualizar agora</button></p>`);
+  b2.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{ const [t,i]=b.dataset.w.split(":"); openTmdbThing(t, +i); });
+  b2.querySelectorAll("[data-wadd]").forEach(b=>b.onclick=async ()=>{ const [t,i]=b.dataset.wadd.split(":"); b.disabled=true; b.textContent="…";
+    try { const d = await TMDB.details(t, +i); await addFromTmdb(t, d, "both"); b.outerHTML = `<span class="wst">📋</span>`; } catch(err){ b.disabled=false; b.textContent="＋"; writeErr(err); } });
+  $("#relRefresh").onclick = async ()=>{ S.relList = await loadReleases(true); render(); };
+}
+// verifica lançamentos em segundo plano (pras Novidades)
+async function checkReleasesBg(){
+  if (!TMDB.ok() || !followSources().length) return;
+  try { S.relList = await loadReleases(); newsTick(); } catch(_){}
+}
+function followCollBtn(d){
+  const c = d && d.belongs_to_collection; if (!c) return "";
+  const on = isFollowing("collection", c.id);
+  return `<button class="chip ${on?"on":""}" data-fcoll="${c.id}" data-cname="${esc(c.name)}" data-cimg="${esc(c.poster_path||"")}" style="margin:8px 0 2px">${on?"✓ Seguindo":"⭐ Seguir"} franquia ${esc(cleanColl(c.name))}</button>`;
+}
+document.addEventListener("click", async e=>{
+  const b = e.target.closest("[data-fcoll]"); if (b){ e.preventDefault(); try { await toggleFollow("collection", +b.dataset.fcoll, b.dataset.cname, b.dataset.cimg); const on = isFollowing("collection", +b.dataset.fcoll); b.classList.toggle("on", on); b.textContent = `${on?"✓ Seguindo":"⭐ Seguir"} franquia ${cleanColl(b.dataset.cname)}`; } catch(err){ writeErr(err); } return; }
+  const fp = e.target.closest("[data-fol]"); if (fp){ e.preventDefault(); try { await toggleFollow("person", +fp.dataset.fol, fp.dataset.fname, fp.dataset.fimg); render(); } catch(err){ writeErr(err); } return; }
+  const uf = e.target.closest("[data-unf]"); if (uf){ e.preventDefault(); e.stopPropagation(); const [t,i] = uf.dataset.unf.split(":"); const f = S.follows.find(x=>x.type===t&&x.tmdbId===+i); try { await toggleFollow(t, +i, f?f.name:"", ""); render(); } catch(err){ writeErr(err); } return; }
+  if (e.target.closest("#relManage")){ S.relManage = !S.relManage; render(); }
+});
 
 // ---------- ajustes ----------
 function openName(force){
@@ -2148,7 +2275,7 @@ $("#nav").addEventListener("click", e=>{
 });
 $("#view").addEventListener("click", e=>{
   const s=e.target.closest("[data-seg]");
-  if (s){ S.filtOpen=false; if(s.dataset.seg==="year") S.year=+s.dataset.val; else if(s.dataset.seg==="us") S.usSeg=s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
+  if (s){ S.filtOpen=false; if(s.dataset.seg==="year") S.year=+s.dataset.val; else if(s.dataset.seg==="us") S.usSeg=s.dataset.val; else if(s.dataset.seg==="ex") S.exSeg=s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
   const rsb=e.target.closest("[data-rseg]"); if(rsb){ S.recSeg=S.recSeg||{}; S.recSeg[S.tab+S.filter[S.tab]]=rsb.dataset.rseg; S.filtOpen=false; S.genre[S.tab]=""; render(); return; }
   const dsb=e.target.closest("[data-dseg]"); if(dsb){ S.doneSeg=S.doneSeg||{}; S.doneSeg[S.tab]=dsb.dataset.dseg; S.filtOpen=false; S.genre[S.tab]=""; render(); return; }
   const gb=e.target.closest("[data-genre]"); if(gb){ S.genre[S.tab]=gb.dataset.genre; S.filtOpen=false; render(); return; }
@@ -2274,6 +2401,7 @@ function showSplash(){
       render();
     }, onErr));
     unsubs.push(API.watch("match", docs=>{ S.match = {}; docs.forEach(d=>S.match[d.id]=d); if (S.matchView) S.matchView(); render(); newsTick(); }, onErr));
+    unsubs.push(API.watch("follows", docs=>{ S.follows = docs; if (S.tab==="people") render(); }, onErr));
     unsubs.push(API.watch("marathons", docs=>{ S.marathons = docs; if (S.tab==="people") render(); newsTick(); }, onErr));
     unsubs.push(API.watch("folders", docs=>{ S.folders = docs; render(); newsTick(); }, onErr));
     unsubs.push(API.watch("goals", docs=>{ S.goals = docs.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); render(); }, onErr));
