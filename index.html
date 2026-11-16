@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="9">
+<meta name="app-version" content="10">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -185,6 +185,23 @@ nav button.on .i{filter:none;opacity:1}
 .collage span{overflow:hidden;background:var(--bg2);display:flex}
 .collage img{width:100%;height:100%;object-fit:cover}
 .fname{font-weight:600;margin-top:8px;font-size:15px}
+.mcard{position:relative;height:min(52vh,500px);aspect-ratio:2/3;max-width:100%;margin:0 auto;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 14px 40px rgba(0,0,0,.5);touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab}
+.mcard img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.minfo{position:absolute;left:0;right:0;bottom:0;padding:50px 16px 14px;background:linear-gradient(transparent,rgba(0,0,0,.92));color:#fff;font-size:13px}
+.minfo b{font-family:Fraunces,serif;font-size:22px;display:block;margin-bottom:2px}
+.mhint{margin-top:6px;color:var(--accent);font-weight:600}
+.stamp{position:absolute;top:22px;padding:6px 12px;border:3px solid;border-radius:10px;font-weight:800;font-size:22px;letter-spacing:1px;opacity:0;transform:rotate(-12deg);z-index:2}
+.stamp.yes{left:18px;color:#3ecf8e;border-color:#3ecf8e}
+.stamp.no{right:18px;color:#ff6b6b;border-color:#ff6b6b;transform:rotate(12deg)}
+.mbtns{display:flex;justify-content:center;align-items:center;gap:22px;margin:16px 0 4px}
+.mb{height:56px;padding:0 22px;border-radius:99px;font-size:17px;font-weight:700;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
+.mb.no{color:#ff6b6b}
+.mb.info{width:46px;height:46px;padding:0;font-size:18px;border-radius:50%}
+.mb.yes{background:var(--accent);border-color:var(--accent);color:#170d08}
+.mrow{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.mrow button{flex:none;width:84px;text-align:left;font-size:12px}
+.mrow img{width:84px;aspect-ratio:2/3;object-fit:cover;border-radius:8px;display:block;margin-bottom:4px}
+.mdot{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--accent);color:#170d08;font-size:11px;font-weight:700;font-style:normal;display:flex;align-items:center;justify-content:center}
 .toast{position:fixed;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:500;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 #auth{display:none;max-width:420px;margin:0 auto;padding-top:8vh}
@@ -264,7 +281,7 @@ const S = {
   filter: { movies:"forme", series:"forme", places:"todo" },
   genre: { movies:"", series:"" },
   q: "", year: new Date().getFullYear(),
-  items: [], people: {}, settings: {}, goals: [], folders: [], usSeg: "us", visited: new Set(), toasted: new Set(),
+  items: [], people: {}, settings: {}, goals: [], folders: [], match: {}, usSeg: "us", visited: new Set(), toasted: new Set(),
   me: null, email: "", loaded: false, splashed: false
 };
 const $ = s => document.querySelector(s);
@@ -455,7 +472,7 @@ function viewWatch(tab){
     .sort((a,b)=> f==="done" ? doneAt(b)-doneAt(a) : (b.createdAt||0)-(a.createdAt||0));
   let h = segHTML(segs, f, tab);
   if (genres.length) h += `<div class="seg" style="padding-top:2px">${[["","Todos os gêneros"], ...genres.map(g=>[g,g])].map(([k,l])=>`<button class="chip ${gsel===k?"on":""}" data-genre="${esc(k)}" style="font-size:13px;padding:6px 12px">${esc(l)}</button>`).join("")}</div>`;
-  h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off">${f!=="done" ? `<button class="btn g" id="rollBtn">🎲 Sortear</button>`:""}</div>`;
+  h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off">${f!=="done" ? `<button class="btn g" id="rollBtn">🎲 Sortear</button>`:""}<button class="btn g" id="matchBtn" style="position:relative;padding:0 14px">🤝 Topa?${(()=>{ const n=matchPending(tab==="series"?"tv":"movie"); const d=S.match[tab==="series"?"tv":"movie"]; return n && d && d.createdBy!==S.me ? `<i class="mdot">${n}</i>` : ""; })()}</button></div>`;
   const word = mt==="filme" ? "filme" : "série";
   if (!list.length){
     if (base.length) return h + emptyHTML("🔎", "Nada encontrado com esse filtro.");
@@ -1231,14 +1248,14 @@ async function openTmdbThing(tt, id){
     });
   } catch(_){ openSheet(`<div class="small" style="padding:30px;text-align:center">Não consegui carregar agora.</div>`); }
 }
-async function addFromTmdb(tt, d, recFor, r={}){
+async function addFromTmdb(tt, d, recFor, r={}, extra={}){
   const p = provsBR(d), first = p && p.stream[0] && matchPlatform(p.stream[0].name);
   const data = { kind:"watch", status:"todo", mediaType: tt==="tv"?"serie":"filme", title:d.title||d.name||r.title||r.name,
     year:(d.release_date||d.first_air_date||r.release_date||r.first_air_date||"").slice(0,4), poster:d.poster_path||r.poster_path||"", cover:"", backdrop:d.backdrop_path||r.backdrop_path||"",
     overview:d.overview||r.overview||"", genres:(d.genres||[]).map(g=>normGenre(g.name)).flat().filter((g,i,a)=>a.indexOf(g)===i).slice(0,3),
     runtime:d.runtime||0, seasons:d.number_of_seasons||0, tmdbId:d.id||r.id, tmdbType:tt,
     platform: first || (p && (p.rent.length||p.buy.length) ? "Aluguel/Compra" : ""),
-    recFor, note:"", createdBy:S.me, createdAt:Date.now(), reviews:{} };
+    recFor, note:"", createdBy:S.me, createdAt:Date.now(), reviews:{}, ...extra };
   await API.add("items", data);
   toast(recFor==="other" ? `Indicado pra ${pName()} 💌` : "Adicionado à lista ✓");
   return data;
@@ -1341,7 +1358,8 @@ function buildEvents(since){
     const t = `<b>${esc(it.title)}</b>`, place = it.kind==="place", w = it.mediaType==="serie" ? "a série" : "o filme";
     if (it.createdBy===o && (it.createdAt||0) > since){
       let txt, icon;
-      if (place){ icon="📍"; txt = it.status==="done" ? `${on} registrou que vocês foram em ${t}` : `${on} quer ir em ${t}`; }
+      if (it.fromMatch){ icon="🍿"; txt = `Fechado! Você e ${on} toparam ${t} — foi pra lista de vocês`; }
+      else if (place){ icon="📍"; txt = it.status==="done" ? `${on} registrou que vocês foram em ${t}` : `${on} quer ir em ${t}`; }
       else if (it.status==="done"){ icon="🎬"; txt = `${on} registrou ${w} ${t} como assistid${it.mediaType==="serie"?"a":"o"}`; }
       else if (forMeFn(it)){ icon="💌"; txt = `${on} te indicou ${w} ${t}`; }
       else if (togetherFn(it)){ icon="💑"; txt = `${on} adicionou ${t} pra vocês verem juntos`; }
@@ -1361,6 +1379,8 @@ function buildEvents(since){
     const ra = mine && mine.reactAt && mine.reactAt[o], re = mine && mine.reactions && mine.reactions[o];
     if (ra > since && re) ev.push({ key:"x"+it.id+ra, at:ra, it, icon:re, tab:tabOf(it), txt: `${on} reagiu ${re} ao seu comentário em ${t}` });
   }
+  for (const [tt, m] of Object.entries(S.match)) if (m && m.createdBy===o && (m.createdAt||0) > since)
+    ev.push({ key:"m"+tt+m.createdAt, at:m.createdAt, match:tt, icon:"🤝", tab: tt==="tv"?"series":"movies", txt: `${on} começou uma rodada do <b>Topa?</b> de ${tt==="tv"?"séries":"filmes"} — bora votar!` });
   for (const f of S.folders) if (f.createdBy===o && (f.createdAt||0) > since)
     ev.push({ key:"f"+f.id, at:f.createdAt, folder:f.id, icon:f.emoji||"📁", tab:"us", txt: `${on} criou a pasta <b>${esc(f.name)}</b>` });
   for (const g of S.goals) if (g.createdBy===o && (g.createdAt||0) > since)
@@ -1390,7 +1410,7 @@ function openNews(auto){
   openSheet(`<h2>✨ Novidades</h2>
     ${!o ? `<div class="small">Quando ${esc(pName())} entrar no app, o que ele(a) fizer aparece aqui.</div>` :
       !list.length ? emptyHTML("🍃", `Nada novo de ${esc(nameRaw(o))} nos últimos dias.`) :
-      `<div class="list" style="margin-top:0">${list.map(e=>`<button class="row news ${fresh.has(e.key)?"fresh":""}" ${e.it?`data-nopen="${esc(e.it.id)}"`:e.folder?`data-nfolder="${esc(e.folder)}"`:""}>
+      `<div class="list" style="margin-top:0">${list.map(e=>`<button class="row news ${fresh.has(e.key)?"fresh":""}" ${e.it?`data-nopen="${esc(e.it.id)}"`:e.folder?`data-nfolder="${esc(e.folder)}"`:e.match?`data-nmatch="${e.match}"`:""}>
         ${e.it ? coverHTML(e.it) : `<div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:30px;aspect-ratio:1/1">${e.icon}</div>`}
         <div class="body"><div style="font-size:14px;line-height:1.35">${e.it?e.icon+" ":""}${e.txt}</div>
           ${e.quote?`<div class="note">“${esc(e.quote)}”</div>`:""}
@@ -1400,6 +1420,7 @@ function openNews(auto){
     root.querySelector(".sheet-x") && root.querySelector(".sheet-x").addEventListener("click", markSeen);
     root.querySelectorAll("[data-nopen]").forEach(b=>b.onclick=()=>{ markSeen(); openDetail(b.dataset.nopen); });
     root.querySelectorAll("[data-nfolder]").forEach(b=>b.onclick=()=>{ markSeen(); openFolder(b.dataset.nfolder); });
+    root.querySelectorAll("[data-nmatch]").forEach(b=>b.onclick=()=>{ markSeen(); openMatch(b.dataset.nmatch); });
   });
 }
 function newsTick(){
@@ -1422,6 +1443,139 @@ function startNews(){
   if (!me.lastSeen) API.set("people/"+S.me, { lastSeen: Date.now() }).catch(()=>{});
   else if (evs.length && !$("#sheetBg").classList.contains("show")) setTimeout(()=>openNews(true), S.settings.photo ? 2000 : 300);
   else if (!evs.length) API.set("people/"+S.me, { lastSeen: Date.now() }).catch(()=>{});
+}
+
+// =============== Topa? 🤝 ===============
+function matchPending(tt){ const d = S.match[tt]; if (!d || !d.deck) return 0; const mv = (d.votes||{})[S.me]||{}; return d.deck.filter(c=>mv[c.id]===undefined).length; }
+function openMatch(tt){
+  const d = S.match[tt];
+  if (!d || !d.deck || !d.deck.length) return openMatchSetup(tt);
+  const o = other(), word = tt==="tv" ? "séries" : "filmes";
+  openSheet(`<h2>🤝 Topa? · ${word}</h2>
+    <div id="mStats" class="small" style="margin:-8px 0 12px"></div>
+    <div id="mCard"></div>
+    <div class="mbtns" id="mBtns"><button class="mb no" id="mNo">Passo</button><button class="mb info" id="mInfo" aria-label="Detalhes">ℹ️</button><button class="mb yes" id="mYes">👍 Topo</button></div>
+    <div id="mMatches"></div>
+    <div class="btns" style="margin-top:12px"><button class="btn g" id="mNew">🔄 Nova rodada</button></div>`, root=>{
+    let cur = null;
+    const doc = ()=>S.match[tt] || { deck:[], votes:{} };
+    const votesOf = u => (doc().votes||{})[u] || {};
+    const drawStats = ()=>{
+      const dd = doc(), n = dd.deck.length, mv = Object.keys(votesOf(S.me)).length, ov = o ? Object.keys(votesOf(o)).length : 0;
+      root.querySelector("#mStats").innerHTML = `Você ${mv}/${n}${o?` · ${esc(nameRaw(o))} ${ov}/${n}`:` · ${esc(pName())} ainda não entrou no app`}${dd.filtersTxt?` · ${esc(dd.filtersTxt)}`:""}`;
+      const ms = o ? dd.deck.filter(c=>votesOf(S.me)[c.id]===1 && votesOf(o)[c.id]===1) : [];
+      root.querySelector("#mMatches").innerHTML = ms.length ? `<div class="sec">🍿 Fechados (${ms.length})</div><div class="mrow">${ms.map(c=>`<button data-mm="${c.id}">${c.p?`<img src="${IMG}w185${esc(c.p)}" alt="">`:""}<span>${esc(c.t)}</span></button>`).join("")}</div>` : "";
+      root.querySelectorAll("[data-mm]").forEach(b=>b.onclick=()=>openTmdbThing(tt, +b.dataset.mm));
+    };
+    const drawCard = ()=>{
+      const mv = votesOf(S.me); cur = doc().deck.find(c=>mv[c.id]===undefined);
+      const box = root.querySelector("#mCard");
+      root.querySelector("#mBtns").style.display = cur ? "flex" : "none";
+      if (!cur){
+        const left = o ? doc().deck.filter(c=>votesOf(o)[c.id]===undefined).length : 0;
+        box.innerHTML = emptyHTML("🎉", `Você votou em tudo!${o && left ? `<br>Falta ${esc(nameRaw(o))} votar em ${left}.` : ""}<br>Os que vocês dois toparem aparecem aqui embaixo e já vão pra lista <b>Juntos</b>.`);
+        return;
+      }
+      box.innerHTML = `<div class="mcard" id="mc">
+        ${cur.p?`<img src="${IMG}w500${esc(cur.p)}" alt="" draggable="false">`:`<div class="ph" style="background:hsl(${hue(cur.t)},45%,30%);font-size:28px">${esc(cur.t)}</div>`}
+        <span class="stamp yes">TOPO</span><span class="stamp no">PASSO</span>
+        <div class="minfo"><b>${esc(cur.t)}</b><div>${[cur.y, cur.v?`★ ${(+cur.v).toFixed(1)}`:"", (cur.g||[]).slice(0,2).join(", ")].filter(Boolean).map(esc).join(" · ")}</div>
+          ${o && votesOf(o)[cur.id]===1 ? `<div class="mhint">👍 ${esc(nameRaw(o))} já topou esse!</div>`:""}</div></div>`;
+      swipeCard(box.querySelector("#mc"), v=>vote(v));
+    };
+    async function vote(v){
+      if (!cur) return;
+      const c = cur, dd = doc();
+      dd.votes = dd.votes || {}; dd.votes[S.me] = { ...(dd.votes[S.me]||{}), [c.id]: v };
+      drawCard(); drawStats();
+      try { await API.update("match/"+tt, { [`votes.${S.me}.${c.id}`]: v }); } catch(err){ writeErr(err); }
+      if (v===1 && o && votesOf(o)[c.id]===1) celebrate(c);
+    }
+    async function celebrate(c){
+      const ov = overlaySheet(`<div class="pick-card" style="padding:10px 0"><div style="font-size:44px">🍿</div><h2 style="font-size:28px;margin:6px 0 14px">Fechado!</h2>
+        <div class="cover" style="width:170px;margin:0 auto 12px">${c.p?`<img src="${IMG}w342${esc(c.p)}" alt="">`:""}</div>
+        <h3>${esc(c.t)}</h3><p class="small">Vocês dois toparam — foi pra lista <b>Juntos</b> 💑</p></div>
+        <div class="btns"><button class="btn p" id="ceGo">Continuar votando</button><button class="btn g" id="ceSee">Ver detalhes</button></div>`);
+      ov.querySelector("#ceGo").onclick = ()=>ov.remove();
+      ov.querySelector("#ceSee").onclick = ()=>{ ov.remove(); openTmdbThing(tt, c.id); };
+      if (!S.items.some(i=>i.tmdbId===c.id && i.tmdbType===tt)){
+        try { const det = await TMDB.details(tt, c.id); await addFromTmdb(tt, det, "both", {}, { fromMatch:true, note:"🤝 Fechado no Topa?" }); } catch(err){ writeErr(err); }
+      }
+    }
+    root.querySelector("#mNo").onclick = ()=>flyOut(-1, ()=>vote(0));
+    root.querySelector("#mYes").onclick = ()=>flyOut(1, ()=>vote(1));
+    root.querySelector("#mInfo").onclick = ()=>cur && openTmdbPeekOverlay(tt, cur);
+    root.querySelector("#mNew").onclick = ()=>{
+      const ov = overlaySheet(`<h2>Começar nova rodada?</h2><p class="small">A rodada atual termina. Os que vocês já fecharam continuam na lista Juntos.</p>
+        <div class="btns"><button class="btn p" id="nrY">Nova rodada</button><button class="btn g" id="nrN">Cancelar</button></div>`);
+      ov.querySelector("#nrN").onclick = ()=>ov.remove();
+      ov.querySelector("#nrY").onclick = ()=>{ ov.remove(); openMatchSetup(tt); };
+    };
+    function flyOut(dir, then){ const c = root.querySelector("#mc"); if(!c) return then();
+      c.style.transition="transform .25s ease-in, opacity .25s"; c.style.transform=`translateX(${dir*130}%) rotate(${dir*18}deg)`; c.style.opacity="0";
+      c.querySelector(".stamp."+(dir>0?"yes":"no")).style.opacity=1; setTimeout(then, 220); }
+    S.matchView = ()=>{ if (!document.body.contains(root.querySelector("#mStats"))){ S.matchView=null; return; } drawStats(); };
+    drawCard(); drawStats();
+  });
+}
+function swipeCard(el, onVote){
+  let x0=null, y0=0, dx=0, dragging=false;
+  const yes = el.querySelector(".stamp.yes"), no = el.querySelector(".stamp.no");
+  el.addEventListener("pointerdown", e=>{ x0=e.clientX; y0=e.clientY; dx=0; dragging=false; el.setPointerCapture && el.setPointerCapture(e.pointerId); });
+  el.addEventListener("pointermove", e=>{ if (x0==null) return; dx = e.clientX-x0; const dy = e.clientY-y0;
+    if (!dragging && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) dragging = true;
+    if (!dragging) return;
+    el.style.transition="none"; el.style.transform=`translateX(${dx}px) rotate(${dx/18}deg)`;
+    yes.style.opacity = Math.max(0, Math.min(1, dx/90)); no.style.opacity = Math.max(0, Math.min(1, -dx/90)); });
+  const end = ()=>{ if (x0==null) return; x0=null;
+    if (dragging && Math.abs(dx) > 90){ const dir = dx>0?1:-1; el.style.transition="transform .2s ease-in, opacity .2s"; el.style.transform=`translateX(${dir*130}%) rotate(${dir*18}deg)`; el.style.opacity="0"; setTimeout(()=>onVote(dir>0?1:0), 180); }
+    else { el.style.transition="transform .2s"; el.style.transform=""; yes.style.opacity=0; no.style.opacity=0; } };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+}
+function openTmdbPeekOverlay(tt, c){
+  const ov = overlaySheet(`<h2>${esc(c.t)}</h2><div class="meta" style="margin:-8px 0 10px">${[c.y, (c.g||[]).join(", ")].filter(Boolean).map(esc).join(" · ")}</div>
+    ${c.o?`<div class="overview">${esc(c.o)}</div>`:""}<div class="sec">Onde assistir</div><div id="pvP" class="small">Buscando…</div>
+    <div class="btns" style="margin-top:12px"><button class="btn g" id="pvX">Voltar</button></div>`);
+  ov.querySelector("#pvX").onclick = ()=>ov.remove();
+  TMDB.details(tt, c.id).then(d=>{ ov.querySelector("#pvP").innerHTML = provsHTML(provsBR(d)); ov.querySelector("#pvP").className=""; }).catch(()=>{ ov.querySelector("#pvP").textContent=""; });
+}
+function openMatchSetup(tt){
+  const word = tt==="tv" ? "séries" : "filmes";
+  openSheet(`<h2>🤝 Nova rodada do Topa?</h2>
+    <p class="small" style="margin:-6px 0 14px">Vou separar 40 ${word} em alta. Cada um vota no seu celular — quando os dois toparem o mesmo, tá fechado e vai pra lista Juntos.</p>
+    <div class="field"><label>Gêneros (opcional)</label><div id="msG" class="small">Carregando…</div></div>
+    <div class="field"><label>Plataformas (opcional)</label><div id="msP" class="small">Carregando…</div></div>
+    <div class="btns"><button class="btn p" id="msGo">Começar rodada</button><button class="btn g" id="msX">Cancelar</button></div>`, async root=>{
+    root.querySelector("#msX").onclick = closeSheet;
+    if (!TMDB.ok()){ root.querySelector("#msG").textContent = "Configure a chave do TMDB."; return; }
+    let gs = [], ps = [];
+    try {
+      [gs, ps] = await Promise.all([TMDB.genres(tt), TMDB.providers(tt)]);
+      root.querySelector("#msG").outerHTML = `<div class="chips" data-multi="mg">${gs.map(g=>`<button type="button" class="chip" data-v="${g.id}">${esc(g.name)}</button>`).join("")}</div>`;
+      root.querySelector("#msP").outerHTML = `<div class="chips" data-multi="mp">${ps.map(p=>`<button type="button" class="chip" data-v="${p.id}" style="display:flex;align-items:center;gap:6px;padding-left:6px">${p.logo?`<img src="${IMG}w92${esc(p.logo)}" style="width:20px;height:20px;border-radius:5px" alt="">`:""}${esc(p.name)}</button>`).join("")}</div>`;
+      wireMulti(root);
+    } catch(_){ root.querySelector("#msG").textContent = "Não consegui carregar agora."; root.querySelector("#msP").textContent = ""; }
+    root.querySelector("#msGo").onclick = async e=>{
+      const gsel = getMulti(root,"mg"), psel = getMulti(root,"mp");
+      e.target.disabled = true; e.target.textContent = "Montando a rodada…";
+      try {
+        const pages = await Promise.all([1,2,3].map(pg=>TMDB.discover(tt, gsel, psel, pg).catch(()=>({results:[]}))));
+        const known = new Set(S.items.filter(i=>i.tmdbId).map(i=>i.tmdbType+i.tmdbId));
+        const gname = Object.fromEntries(gs.map(g=>[g.id,g.name]));
+        let deck = pages.flatMap(p=>p.results||[]).filter((r,i,a)=>a.findIndex(x=>x.id===r.id)===i && !known.has(tt+r.id) && r.poster_path);
+        for (let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
+        deck = deck.slice(0,40).map(r=>({ id:r.id, t:r.title||r.name, y:(r.release_date||r.first_air_date||"").slice(0,4), p:r.poster_path||"", v:r.vote_average||0,
+          g:(r.genre_ids||[]).map(id=>gname[id]).filter(Boolean).slice(0,3), o:(r.overview||"").slice(0,400) }));
+        if (!deck.length){ toast("Nada encontrado com esses filtros"); e.target.disabled=false; e.target.textContent="Começar rodada"; return; }
+        const filtersTxt = [gsel.map(id=>gname[id]).join(", "), ps.filter(p=>psel.includes(String(p.id))).map(p=>p.name).join(", ")].filter(Boolean).join(" · ");
+        await API.del("match/"+tt).catch(()=>{});
+        const data = { deck, votes:{}, filtersTxt, createdBy:S.me, createdAt:Date.now() };
+        await API.set("match/"+tt, data);
+        S.match[tt] = JSON.parse(JSON.stringify(data));
+        toast("Rodada criada 🤝"); openMatch(tt);
+      } catch(err){ e.target.disabled=false; e.target.textContent="Começar rodada"; writeErr(err); }
+    };
+  });
 }
 
 // ---------- ajustes ----------
@@ -1505,6 +1659,7 @@ $("#view").addEventListener("click", e=>{
   const pc=e.target.closest("[data-profile]"); if(pc) return openProfile(pc.dataset.profile);
   const fc=e.target.closest("[data-folder]"); if(fc) return openFolder(fc.dataset.folder);
   if (id==="folderNew") return openFolderNew();
+  if (id==="matchBtn") return openMatch(S.tab==="series"?"tv":"movie");
   if (id==="rollBtn") openRoll();
   else if (id==="goalAdd") openGoal();
   else if (id==="editCouple") openCouple();
@@ -1615,6 +1770,7 @@ function showSplash(){
       if (!S.splashed) showSplash();
       render();
     }, onErr));
+    unsubs.push(API.watch("match", docs=>{ S.match = {}; docs.forEach(d=>S.match[d.id]=d); if (S.matchView) S.matchView(); render(); newsTick(); }, onErr));
     unsubs.push(API.watch("folders", docs=>{ S.folders = docs; render(); newsTick(); }, onErr));
     unsubs.push(API.watch("goals", docs=>{ S.goals = docs.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); render(); }, onErr));
     unsubs.push(API.watch("items", docs=>{
