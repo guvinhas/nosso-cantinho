@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="16">
+<meta name="app-version" content="17">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -504,7 +504,39 @@ const emptyHTML = (icon, text) => `<div class="empty"><div class="big">${icon}</
 // recFor: "other" = pro outro (quem não criou) · "self" = quem criou quer ver · "both" = juntos
 const isMine = i => i.createdBy===S.me;
 const hasMyReview = i => { const r = i.reviews && i.reviews[S.me]; return !!(r && (r.rating || r.text)); };
-const needMyReview = i => i.status==="done" && !hasMyReview(i);
+// como assistiram: together (padrão) | apart (os dois, separados) | solo (só quem está em watchers)
+const watchMode = i => i.watchMode || "together";
+const watchedBy = (i, u) => i.status==="done" && (watchMode(i)!=="solo" || (i.watchers||[]).includes(u));
+const watchedByMe = i => watchedBy(i, S.me);
+const needMyReview = i => watchedByMe(i) && !hasMyReview(i);
+function watchModeTag(i){
+  if (i.kind!=="watch" || i.status!=="done") return "";
+  const m = watchMode(i);
+  if (m==="apart") return "SEPARADOS";
+  if (m==="solo"){ const w = i.watchers||[]; return w.includes(S.me) ? "SÓ VOCÊ" : `SÓ ${(nameRaw(w[0])||"").toUpperCase()}`; }
+  return "";
+}
+function watchModeTxt(i){
+  const m = watchMode(i), w = i.watchers||[];
+  if (m==="apart") return "Cada um assistiu separado";
+  if (m==="solo") return w.includes(S.me) ? `Só você assistiu${other()?` (${esc(nameRaw(other()))} ainda não)`:""}` : `Só ${esc(nameRaw(w[0]))} assistiu`;
+  return "";
+}
+function watchField(it){
+  const o = other(), m = it && it.status==="done" ? watchMode(it) : "together";
+  const soloWho = it && m==="solo" ? ((it.watchers||[])[0]===S.me ? "me" : "other") : "me";
+  const cur = m==="solo" ? "solo_"+soloWho : m;
+  const opts = [["together","💑 Juntos"],["apart","👥 Separados"],["solo_me","🙋 Só eu"]];
+  if (o) opts.push(["solo_other","🙋 Só "+nameRaw(o)]);
+  return `<div class="field"><label>Como vocês assistiram?</label>${chipsInput("fwm", opts, cur)}</div>`;
+}
+function readWatchField(root){
+  const v = chipVal(root,"fwm") || "together", o = other();
+  if (v==="apart") return { watchMode:"apart", watchers:[S.me, o].filter(Boolean) };
+  if (v==="solo_me") return { watchMode:"solo", watchers:[S.me] };
+  if (v==="solo_other") return { watchMode:"solo", watchers:[o] };
+  return { watchMode:"together", watchers:[S.me, o].filter(Boolean) };
+}
 const partnerReviewed = i => { const o = other(); const r = o && i.reviews && i.reviews[o]; return !!(r && (r.rating || r.text)); };
 const forMeFn = i => i.recFor==="other" ? !isMine(i) : i.recFor==="self" ? isMine(i) : i.recFor===S.me;
 const forPartnerFn = i => i.recFor==="other" ? isMine(i) : i.recFor==="self" ? !isMine(i) : (!!i.recFor && i.recFor!=="both" && i.recFor!==S.me);
@@ -564,13 +596,17 @@ function viewWatch(tab){
   const fn = { watching:watchingFn, forme:forMeFn, forpartner:forPartnerFn, together:togetherFn }[f];
   const needN = done.filter(needMyReview).length;
   if (f!=="done" || !needN) S.needOnly = false;
-  const base = f==="done" ? (S.needOnly ? done.filter(needMyReview) : done) : todo.filter(fn);
+  const wmF = { together:i=>watchMode(i)==="together", apart:i=>watchMode(i)==="apart", me:i=>watchMode(i)==="solo"&&(i.watchers||[]).includes(S.me), other:i=>watchMode(i)==="solo"&&!(i.watchers||[]).includes(S.me) };
+  const hasModes = done.some(i=>watchMode(i)!=="together");
+  if (!hasModes || f!=="done") S.wmFilter = "";
+  const base = f==="done" ? (S.needOnly ? done.filter(needMyReview) : done).filter(i=>!S.wmFilter || wmF[S.wmFilter](i)) : todo.filter(fn);
   const genres = [...new Set(base.flatMap(i=>i.genres||[]))].sort((a,b)=>a.localeCompare(b));
   if (S.genre[tab] && !genres.includes(S.genre[tab])) S.genre[tab] = "";
   const gsel = S.genre[tab];
   const list = base.filter(i=>!gsel || (i.genres||[]).includes(gsel)).filter(match)
     .sort((a,b)=> f==="done" ? sortAt(b)-sortAt(a) : (b.createdAt||0)-(a.createdAt||0));
   let h = segHTML(segs, f, tab);
+  if (f==="done" && hasModes) h += `<div class="seg" style="padding-top:2px">${[["","Todos"],["together","💑 Juntos"],["apart","👥 Separados"],["me","🙋 Só eu"],["other","🙋 Só "+pName()]].map(([k,l])=>`<button class="chip ${(S.wmFilter||"")===k?"on":""}" data-wm="${k}" style="font-size:13px;padding:6px 12px">${esc(l)}</button>`).join("")}</div>`;
   if (genres.length) h += `<div class="seg" style="padding-top:2px">${[["","Todos os gêneros"], ...genres.map(g=>[g,g])].map(([k,l])=>`<button class="chip ${gsel===k?"on":""}" data-genre="${esc(k)}" style="font-size:13px;padding:6px 12px">${esc(l)}</button>`).join("")}</div>`;
   h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off">${f!=="done" ? `<button class="btn g" id="rollBtn">🎲 Sortear</button>`:""}<button class="btn g" id="matchBtn" style="position:relative;padding:0 14px">🤝 Topa?${(()=>{ const n=matchPending(tab==="series"?"tv":"movie"); const d=S.match[tab==="series"?"tv":"movie"]; return n && d && d.createdBy!==S.me ? `<i class="mdot">${n}</i>` : ""; })()}</button></div>`;
   const word = mt==="filme" ? "filme" : "série";
@@ -586,7 +622,7 @@ function viewWatch(tab){
     return h + emptyHTML(f==="done"?"🍿":"💌", msg);
   }
   if (f==="done") return h + `<div class="stats" style="align-items:center"><span><b>${done.length}</b> ${word}${done.length!==1?"s":""}</span>${needN?`<button class="chip ${S.needOnly?"on":""}" id="needBtn" style="margin-left:auto;font-size:13px;padding:6px 12px">⭐ Falta eu avaliar (${needN})</button>`:""}</div><div class="grid">${list.map(it=>`
-    <button class="poster" data-open="${esc(it.id)}">${coverHTML(it, isNew(it)?`<span class="newtag">NOVO</span>`:needMyReview(it)&&partnerReviewed(it)?`<span class="newtag">SUA VEZ ⭐</span>`:"")}<div class="t">${esc(it.title)}</div><div class="s">${starStr(avgRating(it))}</div></button>`).join("")}</div>`;
+    <button class="poster" data-open="${esc(it.id)}">${coverHTML(it, (isNew(it)?`<span class="newtag">NOVO</span>`:needMyReview(it)&&partnerReviewed(it)?`<span class="newtag">SUA VEZ ⭐</span>`:"") + (watchModeTag(it)?`<span class="badge">${esc(watchModeTag(it))}</span>`:""))}<div class="t">${esc(it.title)}</div><div class="s">${starStr(avgRating(it))}</div></button>`).join("")}</div>`;
   return h + `<div class="list">${list.map(recRow).join("")}</div>`;
 }
 
@@ -635,7 +671,7 @@ function viewUsAll(){
   const years = [...new Set(S.items.filter(i=>i.status==="done" && doneYear(i)).map(doneYear).concat([new Date().getFullYear()]))].sort((a,b)=>b-a);
   const undated = S.items.filter(i=>i.status==="done" && i.dateMode==="unknown").length;
   const films = done.filter(i=>i.kind==="watch"&&i.mediaType==="filme"), series = done.filter(i=>i.kind==="watch"&&i.mediaType==="serie"), places = done.filter(i=>i.kind==="place");
-  const hours = Math.round(films.reduce((a,i)=>a+(i.runtime||0),0)/60);
+  const hours = Math.round(films.filter(i=>watchMode(i)==="together").reduce((a,i)=>a+(i.runtime||0),0)/60);
   const top = (arr, key) => { const c={}; arr.forEach(i=>[].concat(i[key]||[]).forEach(v=>{ if(v) c[v]=(c[v]||0)+1; })); return Object.entries(c).sort((a,b)=>b[1]-a[1])[0]; };
   const topPlat = top(films.concat(series), "platform"), topGenre = top(films.concat(series), "genres"), topCat = top(places, "category");
   const ppl = Object.keys(S.people);
@@ -803,9 +839,11 @@ function openWatchForm(status, it, mt, defFor){
         ${!editing || isMine(it) ? `<div class="field"><label>Pra quem</label>${chipsInput("ffor", [["other","💌 Pra "+pName()],["both","💑 Nós dois"],["self","🙋 Eu quero ver"]], forVal)}</div>`:""}
         <div class="field"><label>${editing?"Por que assistir?":"Por que você indica?"}</label><textarea id="fNote" placeholder="Conta por que…">${esc(it.note)}</textarea></div>
       ` : editing ? `
+        ${watchField(it)}
         ${dateField("Quando assistiram", it)}
         <div class="field"><label>Ocasião / onde</label><input id="fOcc" placeholder="Ex: no cinema, no nosso aniversário" value="${esc(it.occasion)}"></div>
       ` : `
+        ${watchField(null)}
         ${dateField("Quando assistiram", null)}
         <div class="field"><label>Ocasião / onde</label><input id="fOcc" placeholder="Ex: no cinema, no nosso aniversário"></div>
         <div class="field"><label>Sua nota</label>${starsInput("frate",0)}</div>
@@ -813,7 +851,7 @@ function openWatchForm(status, it, mt, defFor){
       <div class="btns"><button class="btn p" id="fSave">${editing?"Salvar":isRec?"Enviar indicação 💌":"Adicionar"}</button><button class="btn g" id="fCancel">Cancelar</button></div>
     </div>`;
   openSheet(html, root=>{
-    wireChips(root); wireStars(root); wireMulti(root); wireDateField(root);
+    wireChips(root); wireStars(root); wireMulti(root); wireDateField(root); root.querySelector('[data-chips="fwm"]')?.setAttribute("data-req","");
     root.querySelector('[data-chips="ffor"]')?.setAttribute("data-req","");
     root.querySelector("#fCancel").onclick = ()=> editing ? openDetail(it.id) : closeSheet();
 
@@ -894,15 +932,17 @@ function openWatchForm(status, it, mt, defFor){
       data.genres = getMulti(root, "fgen");
       if (isRec){ if (root.querySelector('[data-chips="ffor"]')) data.recFor = chipVal(root,"ffor") || "other"; data.note = val(root,"#fNote"); }
       if (root.querySelector("[data-datefield]")){ Object.assign(data, readDateField(root)); data.occasion = val(root,"#fOcc"); }
+      if (root.querySelector('[data-chips="fwm"]')) Object.assign(data, readWatchField(root));
       e.target.disabled = true;
       try {
         if (editing){ await API.update("items/"+it.id, data); toast("Salvo ✓"); openDetail(it.id); return; }
         const rate = +(root.querySelector('[data-stars="frate"]')?.dataset.val||0), rev = val(root,"#fRev");
+        const iSaw = !data.watchMode || data.watchMode!=="solo" || (data.watchers||[]).includes(S.me);
         const twin = data.tmdbId && twinOf(data.tmdbType, data.tmdbId);
         if (twin){
           if (status==="done" && twin.status!=="done"){
-            const patch = { status:"done", doneBy:S.me, doneMarkedAt:Date.now(), dateMode:data.dateMode, doneAt:data.doneAt, occasion:data.occasion||"", progress:API.DEL() };
-            if (rate||rev){ patch[`reviews.${S.me}.rating`]=rate; patch[`reviews.${S.me}.text`]=rev; patch[`reviews.${S.me}.at`]=Date.now(); }
+            const patch = { status:"done", doneBy:S.me, doneMarkedAt:Date.now(), dateMode:data.dateMode, doneAt:data.doneAt, occasion:data.occasion||"", progress:API.DEL(), watchMode:data.watchMode||"together", watchers:data.watchers||[] };
+            if (iSaw && (rate||rev)){ patch[`reviews.${S.me}.rating`]=rate; patch[`reviews.${S.me}.text`]=rev; patch[`reviews.${S.me}.at`]=Date.now(); }
             await API.update("items/"+twin.id, patch);
             toast("Já estava na lista — marquei como assistido ✓");
           } else toast(twin.status==="done" ? "Vocês já assistiram esse 😉" : "Esse já está na lista de vocês 😉");
@@ -911,7 +951,7 @@ function openWatchForm(status, it, mt, defFor){
         }
         Object.assign(data, { kind:"watch", status, createdBy:S.me, createdAt:Date.now(), reviews:{} });
         if (status==="done"){ data.doneBy=S.me; data.doneMarkedAt=Date.now(); }
-        if (!isRec && (rate||rev)) data.reviews[S.me] = { rating:rate, text:rev, at:Date.now() };
+        if (!isRec && iSaw && (rate||rev)) data.reviews[S.me] = { rating:rate, text:rev, at:Date.now() };
         await API.add("items", data);
         const wantTab = data.mediaType==="serie" ? "series" : "movies";
         const wantSeg = isRec ? ({other:"forpartner", self:"forme", both:"together"}[data.recFor]) : "done";
@@ -1003,7 +1043,7 @@ function openDetail(id){
       <div class="meta">${metaBits.filter(Boolean).map(esc).join(" · ")}</div>
       <div style="margin-top:8px">${progTag(it)}${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}</div>
       ${avgRating(it)?`<div style="color:var(--star);margin-top:8px">${starStr(avgRating(it))}</div>`:""}
-      <div class="small" style="margin-top:6px">${done ? `${whenTxt(it, isPlace?"Fomos":"Assistimos")}${it.occasion?` · ${esc(it.occasion)}`:""}` :
+      <div class="small" style="margin-top:6px">${done ? `${watchMode(it)==="solo" ? whenTxt(it, watchModeTxt(it)) : whenTxt(it, isPlace?"Fomos":watchMode(it)==="apart"?"Cada um assistiu":"Assistimos")}${it.occasion?` · ${esc(it.occasion)}`:""}` :
         (!isPlace ? whoText(it) : `Adicionado por ${esc(nameOf(it.createdBy))}`)}</div>
     </div></div>`;
   if (it.note) html += `<div class="sec">${isPlace?"Notas":done?"Por que foi indicado":"Por que assistir"}</div><div class="rev"><p style="margin:0">${esc(it.note)}</p></div>`;
@@ -1034,6 +1074,9 @@ function openDetail(id){
         ${mine.text?`<p>${esc(mine.text)}</p>`:""}
         ${reactsOn(mine).length?`<div class="got">${reactsOn(mine).map(([u,e])=>`${e} de ${esc(nameRaw(u))}`).join(" · ")}</div>`:""}
         <button class="small" id="dRev" style="margin-top:8px;text-decoration:underline">Editar minha avaliação</button></div>` + othersHTML;
+    } else if (!isPlace && !watchedByMe(it)){
+      html += othersHTML + `<div class="rev yourturn"><div style="font-weight:600;margin-bottom:8px">👀 ${watchModeTxt(it)}. Quando você assistir, marca aqui:</div>
+        <div class="btns h"><button class="btn p" id="alsoSaw">🙋 Eu também vi</button></div></div>`;
     } else {
       const o = other(), theirs = o && revs[o] && (revs[o].rating || revs[o].text) ? revs[o] : null;
       html += othersHTML + `<div class="rev yourturn">
@@ -1043,7 +1086,7 @@ function openDetail(id){
         <button class="btn p" id="qSave" style="margin-top:10px">Salvar minha avaliação</button></div>`;
     }
     const o2 = other();
-    if (o2 && !(revs[o2] && (revs[o2].rating||revs[o2].text))) html += `<div class="small">${esc(nameRaw(o2))} ainda não avaliou.</div>`;
+    if (o2 && watchedBy(it, o2) && !(revs[o2] && (revs[o2].rating||revs[o2].text))) html += `<div class="small">${esc(nameRaw(o2))} ainda não avaliou.</div>`;
   }
   html += `<div class="btns" style="margin-top:18px">`;
   if (!done) html += `<button class="btn p" id="dDone">${isPlace?"📍 Fomos!":"✓ Assistimos"}</button>`;
@@ -1052,6 +1095,12 @@ function openDetail(id){
 
   openSheet(html, root=>{
     root.querySelector("#dRev") && (root.querySelector("#dRev").onclick = ()=>openReview(it, false));
+    root.querySelector("#alsoSaw") && (root.querySelector("#alsoSaw").onclick = async e=>{
+      e.target.disabled = true;
+      try { const ws = [...new Set([...(it.watchers||[]), S.me])];
+        await API.update("items/"+it.id, { watchMode:"apart", watchers:ws, seenAlsoAt:Date.now(), seenAlsoBy:S.me });
+        it.watchMode = "apart"; it.watchers = ws; toast("Marcado 👀 Agora dá sua nota!"); openDetail(it.id);
+      } catch(err){ e.target.disabled=false; writeErr(err); } });
     if (root.querySelector("#qSave")){
       wireStars(root);
       root.querySelector("#qSave").onclick = async e=>{
@@ -1099,19 +1148,20 @@ function openReview(it, markDone){
   const r = (it.reviews||{})[S.me] || {}, isPlace = it.kind==="place";
   openSheet(`<h2>${markDone ? (isPlace?"Como foi?":"O que você achou?") : "Meu comentário"}</h2>
     <p class="small" style="margin-top:-8px">${esc(it.title)}</p>
-    ${markDone?`${dateField("Quando", null)}
+    ${markDone?`${it.kind==="watch"?watchField(null):""}${dateField("Quando", null)}
       <div class="field"><label>Ocasião / onde</label><input id="rOcc" placeholder="${isPlace?"Ex: viagem de férias":"Ex: no cinema, em casa com pipoca"}"></div>`:""}
     <div class="field"><label>Sua nota</label>${starsInput("rrate", r.rating)}</div>
     <div class="field"><label>Comentário</label><textarea id="rText" placeholder="Escreva o que quiser…">${esc(r.text)}</textarea></div>
     <div class="btns"><button class="btn p" id="rSave">${markDone?(isPlace?"Marcar como visitado":"Marcar como assistido"):"Salvar"}</button>
     <button class="btn g" id="rCancel">Cancelar</button></div>`, root=>{
-    wireStars(root); wireDateField(root);
+    wireStars(root); wireDateField(root); wireChips(root); root.querySelector('[data-chips="fwm"]')?.setAttribute("data-req","");
     root.querySelector("#rCancel").onclick = ()=>openDetail(it.id);
     root.querySelector("#rSave").onclick = async e=>{
       const rating = +root.querySelector('[data-stars="rrate"]').dataset.val || 0, text = val(root,"#rText");
       const patch = {};
-      if (rating || text || r.rating || r.text){ patch[`reviews.${S.me}.rating`] = rating; patch[`reviews.${S.me}.text`] = text; patch[`reviews.${S.me}.at`] = Date.now(); }
-      if (markDone){ patch.doneBy=S.me; patch.doneMarkedAt=Date.now(); patch.status="done"; Object.assign(patch, readDateField(root)); patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
+      const iWatched = !patch.watchMode || patch.watchMode!=="solo" || (patch.watchers||[]).includes(S.me);
+      if (iWatched && (rating || text || r.rating || r.text)){ patch[`reviews.${S.me}.rating`] = rating; patch[`reviews.${S.me}.text`] = text; patch[`reviews.${S.me}.at`] = Date.now(); }
+      if (markDone){ patch.doneBy=S.me; patch.doneMarkedAt=Date.now(); patch.status="done"; Object.assign(patch, readDateField(root)); if (root.querySelector('[data-chips="fwm"]')) Object.assign(patch, readWatchField(root)); patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
       if (!Object.keys(patch).length) return openDetail(it.id);
       e.target.disabled = true;
       try { await API.update("items/"+it.id, patch); toast(markDone ? (isPlace?"Marcado como visitado 📍":"Foi pra Assistidos 🎬") : "Salvo ✓"); markDone ? closeSheet() : openDetail(it.id); }
@@ -1528,8 +1578,9 @@ function buildEvents(since){
       ev.push({ key:"r"+it.id+(r.at||0), at:r.at, it, icon:place?"📍":"⭐", tab:tabOf(it),
         txt: `${on} ${marked ? (place?"foi em":"assistiu") + " " + t + " e avaliou" : "avaliou " + t}${stars}`, quote: r.text });
     } else if (marked){
-      ev.push({ key:"d"+it.id, at:it.doneMarkedAt, it, icon:place?"📍":"✅", tab:tabOf(it), txt: `${on} marcou ${t} como ${place?"visitado":"assistido"}` });
+      ev.push({ key:"d"+it.id, at:it.doneMarkedAt, it, icon:place?"📍":"✅", tab:tabOf(it), txt: !place && watchMode(it)==="solo" && !(it.watchers||[]).includes(S.me) ? `${on} assistiu ${t} sem você 👀` : `${on} marcou ${t} como ${place?"visitado":"assistido"}` });
     }
+    if (it.seenAlsoBy===o && (it.seenAlsoAt||0) > since) ev.push({ key:"sa"+it.id+it.seenAlsoAt, at:it.seenAlsoAt, it, icon:"👀", tab:tabOf(it), txt: `${on} também assistiu ${t}` });
     const mine = it.reviews && it.reviews[S.me];
     const ra = mine && mine.reactAt && mine.reactAt[o], re = mine && mine.reactions && mine.reactions[o];
     if (ra > since && re) ev.push({ key:"x"+it.id+ra, at:ra, it, icon:re, tab:tabOf(it), txt: `${on} reagiu ${re} ao seu comentário em ${t}` });
@@ -2066,6 +2117,7 @@ $("#nav").addEventListener("click", e=>{
 $("#view").addEventListener("click", e=>{
   const s=e.target.closest("[data-seg]");
   if (s){ if(s.dataset.seg==="year") S.year=+s.dataset.val; else if(s.dataset.seg==="us") S.usSeg=s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
+  const wb=e.target.closest("[data-wm]"); if(wb){ S.wmFilter=wb.dataset.wm; render(); return; }
   const gb=e.target.closest("[data-genre]"); if(gb){ S.genre[S.tab]=gb.dataset.genre; render(); return; }
   const o=e.target.closest("[data-open]"); if(o) return openDetail(o.dataset.open);
   const gd=e.target.closest("[data-goaldel]"); if(gd) return API.del("goals/"+gd.dataset.goaldel).catch(writeErr);
