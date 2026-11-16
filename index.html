@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="17">
+<meta name="app-version" content="18">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -235,6 +235,11 @@ nav button.on .i{filter:none;opacity:1}
 .castrow b{display:block;color:var(--ink);font-size:12px;line-height:1.2}
 .castrow span:not(.pface){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 nav button{min-width:56px;padding:4px 2px}
+.filtbar{display:flex;gap:8px;margin:6px 0 2px;flex-wrap:wrap}
+.filtbar .chip{font-size:13px;padding:7px 12px}
+.filtpanel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px 12px;margin:8px 0 4px;animation:up .15s ease-out}
+.filtpanel .chips .chip{font-size:13px;padding:6px 12px}
+.flabel{font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.4px;margin:6px 0 6px}
 .toast{position:fixed;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:500;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 #auth{display:none;max-width:420px;margin:0 auto;padding-top:8vh}
@@ -606,8 +611,18 @@ function viewWatch(tab){
   const list = base.filter(i=>!gsel || (i.genres||[]).includes(gsel)).filter(match)
     .sort((a,b)=> f==="done" ? sortAt(b)-sortAt(a) : (b.createdAt||0)-(a.createdAt||0));
   let h = segHTML(segs, f, tab);
-  if (f==="done" && hasModes) h += `<div class="seg" style="padding-top:2px">${[["","Todos"],["together","💑 Juntos"],["apart","👥 Separados"],["me","🙋 Só eu"],["other","🙋 Só "+pName()]].map(([k,l])=>`<button class="chip ${(S.wmFilter||"")===k?"on":""}" data-wm="${k}" style="font-size:13px;padding:6px 12px">${esc(l)}</button>`).join("")}</div>`;
-  if (genres.length) h += `<div class="seg" style="padding-top:2px">${[["","Todos os gêneros"], ...genres.map(g=>[g,g])].map(([k,l])=>`<button class="chip ${gsel===k?"on":""}" data-genre="${esc(k)}" style="font-size:13px;padding:6px 12px">${esc(l)}</button>`).join("")}</div>`;
+  const wmOpts = [["","Todos"],["together","💑 Juntos"],["apart","👥 Separados"],["me","🙋 Só eu"],["other","🙋 Só "+pName()]];
+  const showWm = f==="done" && hasModes;
+  if (genres.length || showWm){
+    const act = [gsel, showWm && S.wmFilter ? (wmOpts.find(o=>o[0]===S.wmFilter)||[])[1] : ""].filter(Boolean);
+    h += `<div class="filtbar"><button class="chip ${act.length?"on":""}" id="filtBtn">⚙️ Filtros${act.length?` · ${esc(act.join(" · "))}`:""} <span style="opacity:.7">${S.filtOpen?"▴":"▾"}</span></button>${act.length?`<button class="chip" id="filtClear">✕ Limpar</button>`:""}</div>`;
+    if (S.filtOpen){
+      h += `<div class="filtpanel">`;
+      if (genres.length) h += `<div class="flabel">Gênero</div><div class="chips">${[["","Todos"], ...genres.map(g=>[g,g])].map(([k,l])=>`<button class="chip ${gsel===k?"on":""}" data-genre="${esc(k)}">${esc(l)}</button>`).join("")}</div>`;
+      if (showWm) h += `<div class="flabel">Como assistiram</div><div class="chips">${wmOpts.map(([k,l])=>`<button class="chip ${(S.wmFilter||"")===k?"on":""}" data-wm="${k}">${esc(l)}</button>`).join("")}</div>`;
+      h += `</div>`;
+    }
+  }
   h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off">${f!=="done" ? `<button class="btn g" id="rollBtn">🎲 Sortear</button>`:""}<button class="btn g" id="matchBtn" style="position:relative;padding:0 14px">🤝 Topa?${(()=>{ const n=matchPending(tab==="series"?"tv":"movie"); const d=S.match[tab==="series"?"tv":"movie"]; return n && d && d.createdBy!==S.me ? `<i class="mdot">${n}</i>` : ""; })()}</button></div>`;
   const word = mt==="filme" ? "filme" : "série";
   if (!list.length){
@@ -2111,14 +2126,16 @@ function writeErr(err){
 $("#nav").addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
   try { document.activeElement && document.activeElement.blur(); } catch(_){}
-  S.tab=b.dataset.tab; S.q=""; try{ history.replaceState(null,"","#"+S.tab); }catch(_){}
+  S.tab=b.dataset.tab; S.q=""; S.filtOpen=false; try{ history.replaceState(null,"","#"+S.tab); }catch(_){}
   window.scrollTo(0,0); render();
 });
 $("#view").addEventListener("click", e=>{
   const s=e.target.closest("[data-seg]");
-  if (s){ if(s.dataset.seg==="year") S.year=+s.dataset.val; else if(s.dataset.seg==="us") S.usSeg=s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
-  const wb=e.target.closest("[data-wm]"); if(wb){ S.wmFilter=wb.dataset.wm; render(); return; }
-  const gb=e.target.closest("[data-genre]"); if(gb){ S.genre[S.tab]=gb.dataset.genre; render(); return; }
+  if (s){ S.filtOpen=false; if(s.dataset.seg==="year") S.year=+s.dataset.val; else if(s.dataset.seg==="us") S.usSeg=s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
+  const wb=e.target.closest("[data-wm]"); if(wb){ S.wmFilter=wb.dataset.wm; S.filtOpen=false; render(); return; }
+  const gb=e.target.closest("[data-genre]"); if(gb){ S.genre[S.tab]=gb.dataset.genre; S.filtOpen=false; render(); return; }
+  const fbtn=e.target.closest("#filtBtn"); if(fbtn){ S.filtOpen=!S.filtOpen; render(); return; }
+  const fcl=e.target.closest("#filtClear"); if(fcl){ S.genre[S.tab]=""; S.wmFilter=""; S.filtOpen=false; render(); return; }
   const o=e.target.closest("[data-open]"); if(o) return openDetail(o.dataset.open);
   const gd=e.target.closest("[data-goaldel]"); if(gd) return API.del("goals/"+gd.dataset.goaldel).catch(writeErr);
   const id = e.target.closest("button")?.id;
