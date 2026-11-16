@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="19">
+<meta name="app-version" content="20">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -609,13 +609,21 @@ function viewWatch(tab){
   const doneHere = done.filter(wmF[ds]);
   const needN = doneHere.filter(needMyReview).length;
   if (f!=="done" || !needN) S.needOnly = false;
-  const base = f==="done" ? (S.needOnly ? doneHere.filter(needMyReview) : doneHere) : todo.filter(fn);
+  // Pra mim / Pra ela: separar "foi indicado" de "quer ver"
+  const wantFn = i => i.recFor==="self";             // a própria pessoa quer ver
+  const recSegs = (f==="forme" || f==="forpartner") ? (()=>{ const all = todo.filter(fn);
+    const a = all.filter(i=>!wantFn(i)), b = all.filter(wantFn);
+    return f==="forme" ? [["rec","💌 "+pName()+" indicou",a],["want","🙋 Eu quero ver",b]] : [["rec","💌 Eu indiquei",a],["want","🙋 "+pName()+" quer ver",b]]; })() : null;
+  S.recSeg = S.recSeg || {};
+  let rs = recSegs ? (S.recSeg[tab+f] || (recSegs[0][2].length || !recSegs[1][2].length ? "rec" : "want")) : null;
+  const base = f==="done" ? (S.needOnly ? doneHere.filter(needMyReview) : doneHere) : recSegs ? recSegs.find(x=>x[0]===rs)[2] : todo.filter(fn);
   const genres = [...new Set(base.flatMap(i=>i.genres||[]))].sort((a,b)=>a.localeCompare(b));
   if (S.genre[tab] && !genres.includes(S.genre[tab])) S.genre[tab] = "";
   const gsel = S.genre[tab];
   const list = base.filter(i=>!gsel || (i.genres||[]).includes(gsel)).filter(match)
     .sort((a,b)=> f==="done" ? sortAt(b)-sortAt(a) : (b.createdAt||0)-(a.createdAt||0));
   let h = segHTML(segs, f, tab);
+  if (recSegs) h += `<div class="seg dseg">${recSegs.map(([k,l,arr])=>`<button class="chip ${rs===k?"on":""}" data-rseg="${k}">${esc(l)} (${arr.length})</button>`).join("")}</div>`;
   if (f==="done" && dsegs.length>1) h += `<div class="seg dseg">${dsegs.map(([k,l,n])=>`<button class="chip ${ds===k?"on":""}" data-dseg="${k}">${esc(l)} (${n})</button>`).join("")}</div>`;
   const showWm = false;
   if (genres.length){
@@ -631,6 +639,9 @@ function viewWatch(tab){
   const word = mt==="filme" ? "filme" : "série";
   if (!list.length){
     if (base.length) return h + emptyHTML("🔎", "Nada encontrado com esse filtro.");
+    if (recSegs){ const msgs = { formerec:`${esc(pName())} ainda não te indicou nenhum${mt==="filme"?"":"a"} ${word} 💌`, formewant:`Toque no <b>+</b> pra anotar ${mt==="filme"?"um filme":"uma série"} que você quer ver.`,
+      forpartnerrec:`Toque no <b>+</b> pra indicar ${mt==="filme"?"um filme":"uma série"} pra ${esc(pName())}.`, forpartnerwant:`Aqui aparece o que ${esc(pName())} anotou que quer ver.` };
+      return h + emptyHTML(rs==="want"?"🙋":"💌", msgs[f+rs]); }
     const msg = {
       watching: "Nenhuma série em andamento.<br>Abra uma série e marque em que episódio vocês pararam.",
       forme: `Nada aqui ainda.<br>Aqui aparece o que ${esc(pName())} indicou pra você — ou toque no <b>+</b> pra anotar ${mt==="filme"?"um filme":"uma série"} que você quer ver.`,
@@ -974,6 +985,7 @@ function openWatchForm(status, it, mt, defFor){
         await API.add("items", data);
         const wantTab = data.mediaType==="serie" ? "series" : "movies";
         const wantSeg = isRec ? ({other:"forpartner", self:"forme", both:"together"}[data.recFor]) : "done";
+        if (isRec && (data.recFor==="self" || data.recFor==="other")){ S.recSeg = S.recSeg||{}; S.recSeg[wantTab+wantSeg] = data.recFor==="self" ? "want" : "rec"; }
         if (!isRec){ S.doneSeg = S.doneSeg||{}; S.doneSeg[wantTab] = data.watchMode==="solo" ? ((data.watchers||[]).includes(S.me) ? "me" : "other") : (data.watchMode||"together"); }
         if (S.tab!==wantTab || S.filter[wantTab]!==wantSeg){ S.tab = wantTab; S.filter[wantTab] = wantSeg; render(); }
         toast(isRec ? (data.recFor==="other" ? `Indicado pra ${pName()} 💌` : "Adicionado à lista ✓") : "Adicionado ✓"); closeSheet();
@@ -2137,6 +2149,7 @@ $("#nav").addEventListener("click", e=>{
 $("#view").addEventListener("click", e=>{
   const s=e.target.closest("[data-seg]");
   if (s){ S.filtOpen=false; if(s.dataset.seg==="year") S.year=+s.dataset.val; else if(s.dataset.seg==="us") S.usSeg=s.dataset.val; else S.filter[s.dataset.seg]=s.dataset.val; render(); return; }
+  const rsb=e.target.closest("[data-rseg]"); if(rsb){ S.recSeg=S.recSeg||{}; S.recSeg[S.tab+S.filter[S.tab]]=rsb.dataset.rseg; S.filtOpen=false; S.genre[S.tab]=""; render(); return; }
   const dsb=e.target.closest("[data-dseg]"); if(dsb){ S.doneSeg=S.doneSeg||{}; S.doneSeg[S.tab]=dsb.dataset.dseg; S.filtOpen=false; S.genre[S.tab]=""; render(); return; }
   const gb=e.target.closest("[data-genre]"); if(gb){ S.genre[S.tab]=gb.dataset.genre; S.filtOpen=false; render(); return; }
   const fbtn=e.target.closest("#filtBtn"); if(fbtn){ S.filtOpen=!S.filtOpen; render(); return; }
