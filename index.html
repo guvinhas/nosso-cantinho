@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="7">
+<meta name="app-version" content="8">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -278,7 +278,12 @@ async function initAPI(){
     import(base+"firebase-app.js"), import(base+"firebase-auth.js"), import(base+"firebase-firestore.js")
   ]);
   const app = initializeApp(CFG.firebase);
-  const auth = A.getAuth(app);
+  // No iPhone (app na Tela de Início) o IndexedDB pode ser apagado ao fechar o app;
+  // o localStorage é mais estável. O Firebase migra sozinho quem já estava logado.
+  let auth;
+  try { auth = A.initializeAuth(app, { persistence: [A.browserLocalPersistence, A.indexedDBLocalPersistence] }); }
+  catch(e){ auth = A.getAuth(app); }
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(_){}
   let db;
   try { db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
   catch(e){ db = F.getFirestore(app); }
@@ -1419,6 +1424,7 @@ document.querySelectorAll("[data-am]").forEach(b=>b.onclick=()=>{
 $("#authForm").onsubmit = async e=>{
   e.preventDefault();
   const email=$("#aEmail").value.trim().toLowerCase(), pass=$("#aPass").value, name=$("#aName").value.trim();
+  try { localStorage.setItem("cantinho_email", email); } catch(_){}
   const msg=$("#aMsg"); msg.textContent="";
   if (authMode==="up" && !name){ msg.textContent="Coloca seu nome 🙂"; return; }
   $("#aGo").disabled=true;
@@ -1454,6 +1460,8 @@ async function checkUpdate(){
   } catch(_){}
 }
 if (!window.__MOCK__){ checkUpdate(); document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) checkUpdate(); }); }
+
+try { const em = localStorage.getItem("cantinho_email"); if (em) $("#aEmail").value = em; } catch(_){}
 
 // =============== início ===============
 let unsubs = [];
