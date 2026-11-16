@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="13">
+<meta name="app-version" content="14">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -205,6 +205,16 @@ nav button.on .i{filter:none;opacity:1}
 .rev.yourturn{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--card))}
 .rev.yourturn .stars button{color:var(--dim);font-size:34px}
 .rev.yourturn .stars button.on{color:var(--star)}
+.res.big{align-items:flex-start;padding:8px;gap:12px}
+.res.big img,.res.big .noimg{width:56px;height:84px;border-radius:7px}
+.res.big b{font-size:15px;margin-bottom:2px}
+.res.big .meta{display:block}
+.res .ov{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;color:#cbbfb3;margin-top:4px;line-height:1.35}
+.sheet-bg.full{align-items:stretch}
+.sheet-bg.full .sheet{height:100%;max-height:none;border-radius:22px 22px 0 0}
+.sheet.tall{min-height:calc(100vh - var(--st) - 24px);min-height:calc(100dvh - var(--st) - 24px)}
+.shead,.shead-wrap>.field:first-child{position:sticky;top:-10px;z-index:4;background:var(--bg2);padding-top:4px}
+.shead-wrap>.field:first-child{padding-bottom:8px;margin-bottom:0}
 .toast{position:fixed;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:500;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 #auth{display:none;max-width:420px;margin:0 auto;padding-top:8vh}
@@ -379,7 +389,7 @@ const TMDB = {
   },
   async search(q, type){
     const d = await this.get("/search/"+type, { query:q, include_adult:"false", region:"BR" });
-    return (d.results||[]).map(r=>({ ...r, media_type:type })).slice(0,8);
+    return (d.results||[]).map(r=>({ ...r, media_type:type })).slice(0,20);
   },
   _cache: {},
   async genres(type){ const k="g"+type; if(!this._cache[k]) this._cache[k]=(await this.get(`/genre/${type}/list`)).genres||[]; return this._cache[k]; },
@@ -677,7 +687,7 @@ function viewUsAll(){
 function openSheet(html, onMount){
   const sh = $("#sheet");
   sh.innerHTML = (S.mustName ? "" : `<button class="sheet-x" aria-label="Fechar">✕</button>`) + `<div class="grab"></div>` + html;
-  sh.style.transform = ""; $("#sheetBg").classList.add("show"); sh.scrollTop=0;
+  sh.style.transform = ""; sh.classList.remove("tall"); $("#sheetBg").classList.add("show"); sh.scrollTop=0;
   const x = sh.querySelector(".sheet-x"); x && (x.onclick = closeSheet);
   onMount && onMount(sh);
 }
@@ -693,7 +703,7 @@ function swipeToClose(sh, close){
 }
 swipeToClose($("#sheet"), ()=>closeSheet());
 document.addEventListener("keydown", e=>{ if (e.key==="Escape"){ const ov=[...document.querySelectorAll(".sheet-bg.show")].pop(); if (ov && ov.id!=="sheetBg") ov.remove(); else if (!S.mustName) closeSheet(); } });
-function closeSheet(){ $("#sheetBg").classList.remove("show"); }
+function closeSheet(){ $("#sheet").classList.remove("tall"); $("#sheetBg").classList.remove("show"); }
 $("#sheetBg").addEventListener("click", e=>{ if(e.target.id==="sheetBg" && !S.mustName) closeSheet(); });
 
 const starsInput = (name, v) => `<div class="stars" data-stars="${name}" data-val="${v||0}">${[1,2,3,4,5].map(n=>`<button type="button" data-n="${n}" class="${n<=(v||0)?"on":""}">★</button>`).join("")}</div>`;
@@ -795,7 +805,7 @@ function openWatchForm(status, it, mt, defFor){
             ${!editing?`<button type="button" class="chip" id="reSearch">↺ Trocar</button>`:""}
           </div></div>`;
       root.querySelector("#pickPoster") && (root.querySelector("#pickPoster").onclick = ()=>openPosterPicker(st, drawPicked));
-      root.querySelector("#reSearch") && (root.querySelector("#reSearch").onclick = ()=>{ root.querySelector("#formBox").style.display="none"; root.querySelector("#searchBox").style.display="block"; root.querySelector("#tq").focus(); });
+      root.querySelector("#reSearch") && (root.querySelector("#reSearch").onclick = ()=>{ root.classList.add("tall"); root.querySelector("#formBox").style.display="none"; root.querySelector("#searchBox").style.display="block"; root.querySelector("#tq").focus(); });
       const f = root.querySelector("#upFile");
       f.onchange = async ()=>{ const file=f.files[0]; if(!file) return; try{ st.cover = await shrink(file,false); drawPicked(); }catch(_){ toast("Não consegui ler essa imagem"); } };
     };
@@ -812,6 +822,7 @@ function openWatchForm(status, it, mt, defFor){
       box.dataset.val=name; box.querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.v===name)); };
 
     async function choose(r){
+      root.classList.remove("tall");
       r.media_type = r.media_type || (st.mediaType==="serie" ? "tv" : "movie");
       st.tmdb = { id:r.id, type:r.media_type }; st.title = r.title||r.name; st.year = (r.release_date||r.first_air_date||"").slice(0,4);
       st.mediaType = r.media_type==="tv"?"serie":"filme"; st.poster = r.poster_path||""; st.backdrop = r.backdrop_path||""; st.overview = r.overview||""; st.cover="";
@@ -833,8 +844,9 @@ function openWatchForm(status, it, mt, defFor){
 
     if (editing){ drawPicked(); drawManual(!st.tmdb); }
     else {
-      root.querySelector("#manual").onclick = ()=>{ st.tmdb=null; st.title=val(root,"#tq"); root.querySelector("#searchBox").style.display="none"; root.querySelector("#formBox").style.display="block"; root.querySelector("#provBox").innerHTML=""; drawManual(true); drawPicked(); root.querySelector("#fTitle").focus(); };
+      root.querySelector("#manual").onclick = ()=>{ root.classList.remove("tall"); st.tmdb=null; st.title=val(root,"#tq"); root.querySelector("#searchBox").style.display="none"; root.querySelector("#formBox").style.display="block"; root.querySelector("#provBox").innerHTML=""; drawManual(true); drawPicked(); root.querySelector("#fTitle").focus(); };
       const tq = root.querySelector("#tq"), tres = root.querySelector("#tres"); let tmr, seq=0;
+      root.classList.add("tall"); root.querySelector("#searchBox").classList.add("shead-wrap");
       setTimeout(()=>tq.focus(), 300);
       tq.oninput = ()=>{
         clearTimeout(tmr); const q = tq.value.trim();
@@ -842,10 +854,8 @@ function openWatchForm(status, it, mt, defFor){
         tmr = setTimeout(async ()=>{
           const my = ++seq; tres.innerHTML = `<div class="small">Buscando…</div>`;
           try {
-            const rs = await TMDB.search(q, st.mediaType==="serie"?"tv":"movie"); if (my!==seq) return;
-            tres.innerHTML = rs.length ? rs.map((r,i)=>`<button type="button" class="res" data-i="${i}">
-              ${r.poster_path?`<img src="${IMG}w92${esc(r.poster_path)}" alt="">`:`<span class="noimg"></span>`}
-              <span style="min-width:0"><b>${esc(r.title||r.name)}</b><span class="meta">${(r.release_date||r.first_air_date)?esc((r.release_date||r.first_air_date).slice(0,4)):""}${r.overview?" · "+esc(r.overview.slice(0,60))+"…":""}</span></span></button>`).join("")
+            const rs = sortResults(await TMDB.search(q, st.mediaType==="serie"?"tv":"movie")).slice(0,12); if (my!==seq) return;
+            tres.innerHTML = rs.length ? rs.map((r,i)=>resultHTML(r, i, false)).join("")
               : `<div class="small">Nada encontrado. Tente outro nome ou preencha na mão.</div>`;
             tres.querySelectorAll(".res").forEach(b=>b.onclick=()=>choose(rs[+b.dataset.i]));
           } catch(e){ if (my===seq) tres.innerHTML = `<div class="small">Não consegui buscar agora (${esc(e.message)}). Confira a chave do TMDB no config.js.</div>`; }
@@ -1287,8 +1297,20 @@ function openProfileEdit(){
 }
 
 // sobreposição de busca no TMDB (type: movie | tv | multi)
-function overlaySheet(html){
-  const ov = document.createElement("div"); ov.className = "sheet-bg show"; ov.style.zIndex = 30;
+function sortResults(rs){
+  // relevância do TMDB + popularidade: títulos com o mesmo nome ficam do mais famoso pro menos
+  return rs.map((r,i)=>({ r, sc:(r.popularity||0) * (1 - Math.min(i,10)*0.04) + (r.vote_count||0)/400 })).sort((a,b)=>b.sc-a.sc).map(x=>x.r);
+}
+function resultHTML(r, i, showType){
+  const title = r.title||r.name, orig = r.original_title||r.original_name, year = (r.release_date||r.first_air_date||"").slice(0,4);
+  const meta = [showType ? (r.media_type==="tv"?"Série":"Filme") : "", year, r.vote_count>20 && r.vote_average ? `★ ${r.vote_average.toFixed(1)}` : ""].filter(Boolean).join(" · ");
+  return `<button type="button" class="res big" data-i="${i}">${r.poster_path?`<img src="${IMG}w154${esc(r.poster_path)}" alt="" loading="lazy">`:`<span class="noimg"></span>`}
+    <span style="min-width:0;flex:1"><b>${esc(title)}</b><span class="meta">${esc(meta)}</span>
+    ${orig && orig!==title ? `<span class="meta" style="font-style:italic">Original: ${esc(orig)}</span>` : ""}
+    ${r.overview ? `<span class="ov">${esc(r.overview)}</span>` : ""}</span></button>`;
+}
+function overlaySheet(html, opts={}){
+  const ov = document.createElement("div"); ov.className = "sheet-bg show" + (opts.full ? " full" : ""); ov.style.zIndex = 30;
   ov.innerHTML = `<div class="sheet"><button class="sheet-x" aria-label="Fechar">✕</button><div class="grab"></div>${html}</div>`;
   document.body.appendChild(ov); ov.addEventListener("click", e=>{ if(e.target===ov) ov.remove(); });
   ov.querySelector(".sheet-x").onclick = ()=>ov.remove(); swipeToClose(ov.querySelector(".sheet"), ()=>ov.remove());
@@ -1296,18 +1318,18 @@ function overlaySheet(html){
 }
 function openTmdbSearch(type, title, onPick){
   if (!TMDB.ok()) return toast("Configure a chave do TMDB");
-  const ov = overlaySheet(`<h2>${esc(title)}</h2><div class="field"><input id="osq" placeholder="🔎 Buscar…" autocomplete="off" autocapitalize="off"></div><div class="results" id="osr"></div><div class="btns"><button class="btn g" id="osx">Cancelar</button></div>`);
+  const ov = overlaySheet(`<div class="shead"><h2>${esc(title)}</h2><div class="field" style="margin-bottom:8px"><input id="osq" placeholder="🔎 Digite o nome…" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div></div><div class="results" id="osr"><div class="small">Dica: se tiver vários com o mesmo nome, confira o ano e o pôster.</div></div><div class="btns"><button class="btn g" id="osx">Cancelar</button></div>`, { full:true });
   const q = ov.querySelector("#osq"), out = ov.querySelector("#osr"); let t, seq=0;
   ov.querySelector("#osx").onclick = ()=>ov.remove(); setTimeout(()=>q.focus(), 250);
   q.oninput = ()=>{ clearTimeout(t); const s=q.value.trim(); if(s.length<2){ out.innerHTML=""; return; }
     t = setTimeout(async ()=>{ const my=++seq; out.innerHTML=`<div class="small">Buscando…</div>`;
       try {
         let rs;
-        if (type==="multi"){ const d = await TMDB.get("/search/multi", { query:s, include_adult:"false" }); rs = (d.results||[]).filter(r=>r.media_type==="movie"||r.media_type==="tv").slice(0,8); }
+        if (type==="multi"){ const d = await TMDB.get("/search/multi", { query:s, include_adult:"false" }); rs = (d.results||[]).filter(r=>r.media_type==="movie"||r.media_type==="tv"); }
         else rs = await TMDB.search(s, type);
+        rs = sortResults(rs).slice(0,12);
         if (my!==seq) return;
-        out.innerHTML = rs.length ? rs.map((r,i)=>`<button type="button" class="res" data-i="${i}">${r.poster_path?`<img src="${IMG}w92${esc(r.poster_path)}" alt="">`:`<span class="noimg"></span>`}
-          <span style="min-width:0"><b>${esc(r.title||r.name)}</b><span class="meta">${r.media_type==="tv"?"Série":"Filme"}${(r.release_date||r.first_air_date)?" · "+esc((r.release_date||r.first_air_date).slice(0,4)):""}</span></span></button>`).join("") : `<div class="small">Nada encontrado.</div>`;
+        out.innerHTML = rs.length ? rs.map((r,i)=>resultHTML(r, i, type==="multi")).join("") : `<div class="small">Nada encontrado.</div>`;
         out.querySelectorAll(".res").forEach(b=>b.onclick=()=>{ ov.remove(); onPick(rs[+b.dataset.i]); });
       } catch(_){ if(my===seq) out.innerHTML=`<div class="small">Não consegui buscar agora.</div>`; } }, 300); };
 }
