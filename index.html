@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="15">
+<meta name="app-version" content="16">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -897,9 +897,20 @@ function openWatchForm(status, it, mt, defFor){
       e.target.disabled = true;
       try {
         if (editing){ await API.update("items/"+it.id, data); toast("Salvo ✓"); openDetail(it.id); return; }
+        const rate = +(root.querySelector('[data-stars="frate"]')?.dataset.val||0), rev = val(root,"#fRev");
+        const twin = data.tmdbId && twinOf(data.tmdbType, data.tmdbId);
+        if (twin){
+          if (status==="done" && twin.status!=="done"){
+            const patch = { status:"done", doneBy:S.me, doneMarkedAt:Date.now(), dateMode:data.dateMode, doneAt:data.doneAt, occasion:data.occasion||"", progress:API.DEL() };
+            if (rate||rev){ patch[`reviews.${S.me}.rating`]=rate; patch[`reviews.${S.me}.text`]=rev; patch[`reviews.${S.me}.at`]=Date.now(); }
+            await API.update("items/"+twin.id, patch);
+            toast("Já estava na lista — marquei como assistido ✓");
+          } else toast(twin.status==="done" ? "Vocês já assistiram esse 😉" : "Esse já está na lista de vocês 😉");
+          const wt = twin.mediaType==="serie" ? "series" : "movies"; S.tab = wt; render();
+          return openDetail(twin.id);
+        }
         Object.assign(data, { kind:"watch", status, createdBy:S.me, createdAt:Date.now(), reviews:{} });
         if (status==="done"){ data.doneBy=S.me; data.doneMarkedAt=Date.now(); }
-        const rate = +(root.querySelector('[data-stars="frate"]')?.dataset.val||0), rev = val(root,"#fRev");
         if (!isRec && (rate||rev)) data.reviews[S.me] = { rating:rate, text:rev, at:Date.now() };
         await API.add("items", data);
         const wantTab = data.mediaType==="serie" ? "series" : "movies";
@@ -1391,6 +1402,8 @@ async function openTmdbThing(tt, id){
   } catch(_){ openSheet(`<div class="small" style="padding:30px;text-align:center">Não consegui carregar agora.</div>`); }
 }
 async function addFromTmdb(tt, d, recFor, r={}, extra={}){
+  const twin = twinOf(tt, d.id||r.id);
+  if (twin){ toast(twin.status==="done" ? "Vocês já assistiram esse 😉" : "Esse já está na lista 😉"); return twin; }
   const p = provsBR(d), first = p && p.stream[0] && matchPlatform(p.stream[0].name);
   const data = { kind:"watch", status:"todo", mediaType: tt==="tv"?"serie":"filme", title:d.title||d.name||r.title||r.name,
     year:(d.release_date||d.first_air_date||r.release_date||r.first_air_date||"").slice(0,4), poster:d.poster_path||r.poster_path||"", cover:"", backdrop:d.backdrop_path||r.backdrop_path||"",
@@ -1721,6 +1734,45 @@ function openMatchSetup(tt){
       } catch(err){ e.target.disabled=false; e.target.textContent="Começar rodada"; writeErr(err); }
     };
   });
+}
+
+// =============== duplicados ===============
+const twinOf = (tt, id, exceptId) => id ? S.items.find(i=>i.kind==="watch" && i.tmdbId===id && i.tmdbType===tt && i.id!==exceptId) : null;
+function mergeReviews(a, b){
+  const out = { ...(a||{}) };
+  for (const [u, r] of Object.entries(b||{})){
+    const cur = out[u];
+    if (!cur || (!(cur.rating||cur.text) && (r.rating||r.text)) || ((r.at||0) > (cur.at||0) && (r.rating||r.text))) out[u] = { ...(cur||{}), ...r, reactions:{ ...((cur&&cur.reactions)||{}), ...(r.reactions||{}) } };
+  }
+  return out;
+}
+// junta cópias do mesmo filme/série (mesmo título do TMDB): fica a assistida (ou a mais antiga), as outras somem
+let dedupeBusy = false;
+async function dedupeItems(){
+  if (dedupeBusy || !S.me) return;
+  const groups = {};
+  S.items.filter(i=>i.kind==="watch" && i.tmdbId).forEach(i=>{ const k=i.tmdbType+i.tmdbId; (groups[k]=groups[k]||[]).push(i); });
+  const dups = Object.values(groups).filter(g=>g.length>1);
+  if (!dups.length) return;
+  dedupeBusy = true;
+  try {
+    for (const g of dups){
+      g.sort((a,b)=> (a.status==="done"?0:1)-(b.status==="done"?0:1) || Object.keys(b.reviews||{}).length-Object.keys(a.reviews||{}).length || (a.createdAt||0)-(b.createdAt||0));
+      const keep = g[0], rest = g.slice(1);
+      let reviews = keep.reviews || {}; const patch = {};
+      for (const o of rest){
+        reviews = mergeReviews(reviews, o.reviews);
+        if (!keep.note && o.note) patch.note = o.note;
+        if (!keep.platform && o.platform) patch.platform = o.platform;
+        if (o.fromMatch && !keep.fromMatch) patch.fromMatch = true;
+        if (keep.status!=="done" && o.progress && !keep.progress) patch.progress = o.progress;
+      }
+      if (JSON.stringify(reviews)!==JSON.stringify(keep.reviews||{})) patch.reviews = reviews;
+      if (Object.keys(patch).length) await API.update("items/"+keep.id, patch);
+      for (const o of rest) await API.del("items/"+o.id);
+    }
+  } catch(err){ console.warn("dedupe", err); }
+  finally { dedupeBusy = false; }
 }
 
 // =============== 🎭 pessoas ===============
@@ -2140,6 +2192,7 @@ function showSplash(){
     unsubs.push(API.watch("goals", docs=>{ S.goals = docs.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); render(); }, onErr));
     unsubs.push(API.watch("items", docs=>{
       S.items = docs; S.loaded = true; clearTimeout(timer); setStatus("");
+      clearTimeout(S._dd); S._dd = setTimeout(dedupeItems, 1500);
       render();
       if (!S.newsReady && gotPeople) setTimeout(startNews, 700); else newsTick();
     }, onErr));
