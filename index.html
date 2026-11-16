@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="12">
+<meta name="app-version" content="13">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -202,6 +202,9 @@ nav button.on .i{filter:none;opacity:1}
 .mrow button{flex:none;width:84px;text-align:left;font-size:12px}
 .mrow img{width:84px;aspect-ratio:2/3;object-fit:cover;border-radius:8px;display:block;margin-bottom:4px}
 .mdot{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--accent);color:#170d08;font-size:11px;font-weight:700;font-style:normal;display:flex;align-items:center;justify-content:center}
+.rev.yourturn{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--card))}
+.rev.yourturn .stars button{color:var(--dim);font-size:34px}
+.rev.yourturn .stars button.on{color:var(--star)}
 .toast{position:fixed;left:50%;bottom:calc(var(--sb) + 150px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:500;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 #auth{display:none;max-width:420px;margin:0 auto;padding-top:8vh}
@@ -469,6 +472,9 @@ const segHTML = (opts, cur, key) => `<div class="seg">${opts.map(([k,l])=>`<butt
 const emptyHTML = (icon, text) => `<div class="empty"><div class="big">${icon}</div>${text}</div>`;
 // recFor: "other" = pro outro (quem não criou) · "self" = quem criou quer ver · "both" = juntos
 const isMine = i => i.createdBy===S.me;
+const hasMyReview = i => { const r = i.reviews && i.reviews[S.me]; return !!(r && (r.rating || r.text)); };
+const needMyReview = i => i.status==="done" && !hasMyReview(i);
+const partnerReviewed = i => { const o = other(); const r = o && i.reviews && i.reviews[o]; return !!(r && (r.rating || r.text)); };
 const forMeFn = i => i.recFor==="other" ? !isMine(i) : i.recFor==="self" ? isMine(i) : i.recFor===S.me;
 const forPartnerFn = i => i.recFor==="other" ? isMine(i) : i.recFor==="self" ? !isMine(i) : (!!i.recFor && i.recFor!=="both" && i.recFor!==S.me);
 const togetherFn = i => i.recFor==="both" || !i.recFor;
@@ -523,7 +529,9 @@ function viewWatch(tab){
     ["together","Juntos"+cnt(todo.filter(togetherFn).length)], ["done","✓ Assistidos"+cnt(done.length)]);
   let f = S.filter[tab]; if (!segs.find(x=>x[0]===f)) f = S.filter[tab] = "forme";
   const fn = { watching:watchingFn, forme:forMeFn, forpartner:forPartnerFn, together:togetherFn }[f];
-  const base = f==="done" ? done : todo.filter(fn);
+  const needN = done.filter(needMyReview).length;
+  if (f!=="done" || !needN) S.needOnly = false;
+  const base = f==="done" ? (S.needOnly ? done.filter(needMyReview) : done) : todo.filter(fn);
   const genres = [...new Set(base.flatMap(i=>i.genres||[]))].sort((a,b)=>a.localeCompare(b));
   if (S.genre[tab] && !genres.includes(S.genre[tab])) S.genre[tab] = "";
   const gsel = S.genre[tab];
@@ -544,8 +552,8 @@ function viewWatch(tab){
     }[f];
     return h + emptyHTML(f==="done"?"🍿":"💌", msg);
   }
-  if (f==="done") return h + `<div class="stats"><span><b>${done.length}</b> ${word}${done.length!==1?"s":""}</span></div><div class="grid">${list.map(it=>`
-    <button class="poster" data-open="${esc(it.id)}">${coverHTML(it, isNew(it)?`<span class="newtag">NOVO</span>`:"")}<div class="t">${esc(it.title)}</div><div class="s">${starStr(avgRating(it))}</div></button>`).join("")}</div>`;
+  if (f==="done") return h + `<div class="stats" style="align-items:center"><span><b>${done.length}</b> ${word}${done.length!==1?"s":""}</span>${needN?`<button class="chip ${S.needOnly?"on":""}" id="needBtn" style="margin-left:auto;font-size:13px;padding:6px 12px">⭐ Falta eu avaliar (${needN})</button>`:""}</div><div class="grid">${list.map(it=>`
+    <button class="poster" data-open="${esc(it.id)}">${coverHTML(it, isNew(it)?`<span class="newtag">NOVO</span>`:needMyReview(it)&&partnerReviewed(it)?`<span class="newtag">SUA VEZ ⭐</span>`:"")}<div class="t">${esc(it.title)}</div><div class="s">${starStr(avgRating(it))}</div></button>`).join("")}</div>`;
   return h + `<div class="list">${list.map(recRow).join("")}</div>`;
 }
 
@@ -968,21 +976,30 @@ function openDetail(id){
       <div><div class="small" style="text-align:center;margin-bottom:6px">Episódio</div><div class="stepper"><button data-step="e" data-d="-1">−</button><b id="pe">${p.e||"–"}</b><button data-step="e" data-d="1">+</button></div></div></div>`;
   }
   if (done){
-    html += `<div class="sec">Comentários</div>`;
-    const mine = revs[S.me];
+    html += `<div class="sec">Avaliações</div>`;
+    const mine = revs[S.me] && (revs[S.me].rating || revs[S.me].text) ? revs[S.me] : null;
     const reactsOn = r => Object.entries((r&&r.reactions)||{});
-    html += `<div class="rev" style="border-color:color-mix(in srgb,var(--accent) 40%,var(--line))"><div class="who"><span style="display:flex;align-items:center;gap:8px;color:var(--ink)">${avatarHTML(S.me,24)}Você</span> ${mine&&mine.rating?`<span>${starStr(mine.rating)}</span>`:""}</div>
-      ${mine&&mine.text?`<p>${esc(mine.text)}</p>`:""}
-      ${reactsOn(mine).length?`<div class="got">${reactsOn(mine).map(([u,e])=>`${e} de ${esc(nameRaw(u))}`).join(" · ")}</div>`:""}
-      <button class="small" id="dRev" style="margin-top:8px;text-decoration:underline">${mine?"Editar meu comentário":"Escrever meu comentário"}</button></div>`;
-    Object.keys(revs).filter(u=>u!==S.me).forEach(uid=>{
-      const r = revs[uid]; if(!r) return;
+    const othersHTML = Object.keys(revs).filter(u=>u!==S.me).map(uid=>{
+      const r = revs[uid]; if(!r || !(r.rating||r.text)) return "";
       const my = r.reactions && r.reactions[S.me];
-      html += `<div class="rev"><div class="who"><span style="display:flex;align-items:center;gap:8px;color:var(--ink)">${avatarHTML(uid,24)}${esc(nameRaw(uid))}</span> ${r.rating?`<span>${starStr(r.rating)}</span>`:""}</div>${r.text?`<p>${esc(r.text)}</p>`:""}
+      return `<div class="rev"><div class="who"><span style="display:flex;align-items:center;gap:8px;color:var(--ink)">${avatarHTML(uid,24)}${esc(nameRaw(uid))}</span> ${r.rating?`<span>${starStr(r.rating)}</span>`:""}</div>${r.text?`<p>${esc(r.text)}</p>`:""}
         <div class="reacts">${REACTIONS.map(e=>`<button data-react="${uid}" data-e="${e}" class="${my===e?"on":""}">${e}</button>`).join("")}</div></div>`;
-    });
-    const o = other();
-    if (o && !revs[o]) html += `<div class="small">${esc(nameRaw(o))} ainda não comentou.</div>`;
+    }).join("");
+    if (mine){
+      html += `<div class="rev" style="border-color:color-mix(in srgb,var(--accent) 40%,var(--line))"><div class="who"><span style="display:flex;align-items:center;gap:8px;color:var(--ink)">${avatarHTML(S.me,24)}Você</span> ${mine.rating?`<span>${starStr(mine.rating)}</span>`:""}</div>
+        ${mine.text?`<p>${esc(mine.text)}</p>`:""}
+        ${reactsOn(mine).length?`<div class="got">${reactsOn(mine).map(([u,e])=>`${e} de ${esc(nameRaw(u))}`).join(" · ")}</div>`:""}
+        <button class="small" id="dRev" style="margin-top:8px;text-decoration:underline">Editar minha avaliação</button></div>` + othersHTML;
+    } else {
+      const o = other(), theirs = o && revs[o] && (revs[o].rating || revs[o].text) ? revs[o] : null;
+      html += othersHTML + `<div class="rev yourturn">
+        <div style="font-weight:600;margin-bottom:6px">⭐ ${theirs ? `${esc(nameRaw(o))} ${theirs.rating?`deu ${theirs.rating} ${theirs.rating===1?"estrela":"estrelas"}`:"já comentou"} — e você?` : "E você, o que achou?"}</div>
+        ${starsInput("qrate", 0)}
+        <textarea id="qText" placeholder="Seu comentário (opcional)" style="margin-top:10px;min-height:64px"></textarea>
+        <button class="btn p" id="qSave" style="margin-top:10px">Salvar minha avaliação</button></div>`;
+    }
+    const o2 = other();
+    if (o2 && !(revs[o2] && (revs[o2].rating||revs[o2].text))) html += `<div class="small">${esc(nameRaw(o2))} ainda não avaliou.</div>`;
   }
   html += `<div class="btns" style="margin-top:18px">`;
   if (!done) html += `<button class="btn p" id="dDone">${isPlace?"📍 Fomos!":"✓ Assistimos"}</button>`;
@@ -991,6 +1008,18 @@ function openDetail(id){
 
   openSheet(html, root=>{
     root.querySelector("#dRev") && (root.querySelector("#dRev").onclick = ()=>openReview(it, false));
+    if (root.querySelector("#qSave")){
+      wireStars(root);
+      root.querySelector("#qSave").onclick = async e=>{
+        const rating = +root.querySelector('[data-stars="qrate"]').dataset.val || 0, text = val(root,"#qText");
+        if (!rating && !text){ toast("Dá uma nota ou escreve algo 🙂"); return; }
+        e.target.disabled = true;
+        try { await API.update("items/"+it.id, { [`reviews.${S.me}.rating`]: rating, [`reviews.${S.me}.text`]: text, [`reviews.${S.me}.at`]: Date.now() });
+          it.reviews = { ...(it.reviews||{}), [S.me]: { ...((it.reviews||{})[S.me]||{}), rating, text, at:Date.now() } };
+          toast("Avaliação salva ⭐"); openDetail(it.id); }
+        catch(err){ e.target.disabled=false; writeErr(err); }
+      };
+    }
     root.querySelector("#dDone") && (root.querySelector("#dDone").onclick = ()=>openReview(it, true));
     root.querySelector("#dEdit").onclick = ()=> isPlace ? openPlaceForm(it.status, it) : openWatchForm(it.status, it);
     root.querySelector("#dDel").onclick = ()=>confirmDelete(it);
@@ -1727,6 +1756,7 @@ $("#view").addEventListener("click", e=>{
   const pc=e.target.closest("[data-profile]"); if(pc) return openProfile(pc.dataset.profile);
   const fc=e.target.closest("[data-folder]"); if(fc) return openFolder(fc.dataset.folder);
   if (id==="folderNew") return openFolderNew();
+  if (id==="needBtn"){ S.needOnly = !S.needOnly; return render(); }
   if (id==="matchBtn") return openMatch(S.tab==="series"?"tv":"movie");
   if (id==="rollBtn") openRoll();
   else if (id==="goalAdd") openGoal();
