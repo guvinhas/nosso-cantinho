@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="11">
+<meta name="app-version" content="12">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -292,7 +292,41 @@ const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.
 const toISO = ms => { const d=new Date(ms); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const fromISO = s => { if(!s) return Date.now(); const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d,12).getTime(); };
 const fmtDate = ms => { const d=new Date(ms); return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`; };
-const doneAt = it => it.doneAt || it.createdAt || 0;
+const doneAt = it => it.dateMode==="unknown" ? 0 : (it.doneAt || it.createdAt || 0);
+const sortAt = it => it.dateMode==="unknown" ? (it.doneMarkedAt || it.createdAt || 0) : doneAt(it);
+const exactDate = it => it.status==="done" && (!it.dateMode || it.dateMode==="exact");
+const doneYear = it => it.dateMode==="unknown" ? null : new Date(doneAt(it)).getFullYear();
+function whenTxt(it, verb){
+  if (it.dateMode==="unknown") return `${verb} (não lembramos quando)`;
+  if (it.dateMode==="year") return `${verb} em ${new Date(doneAt(it)).getFullYear()}`;
+  return `${verb} em ${fmtDate(doneAt(it))}`;
+}
+const shortWhen = it => it.dateMode==="unknown" ? "sem data" : it.dateMode==="year" ? String(new Date(doneAt(it)).getFullYear()) : fmtDate(doneAt(it));
+function dateField(label, it){
+  const mode = (it && it.dateMode) || "exact", ms = it && it.status==="done" && it.dateMode!=="unknown" ? doneAt(it) : Date.now();
+  const yNow = new Date().getFullYear(), ySel = new Date(ms).getFullYear();
+  const years = []; for (let y=yNow; y>=yNow-40; y--) years.push(y);
+  return `<div class="field" data-datefield><label>${label}</label>
+    <div class="chips" style="margin-bottom:8px">${[["exact","📅 Sei a data"],["year","🗓️ Só lembro o ano"],["unknown","🤷 Não lembro"]].map(([k,l])=>`<button type="button" class="chip ${k===mode?"on":""}" data-dm="${k}">${l}</button>`).join("")}</div>
+    <input type="date" data-dexact value="${toISO(ms)}" max="${today()}" style="${mode==="exact"?"":"display:none"}">
+    <select data-dyear style="${mode==="year"?"":"display:none"}">${years.map(y=>`<option value="${y}" ${y===ySel?"selected":""}>${y}</option>`).join("")}</select>
+    <div class="small" data-dunk style="${mode==="unknown"?"":"display:none"}">Sem problema — fica sem data e não entra nos meses da retrospectiva.</div></div>`;
+}
+function wireDateField(root){
+  const f = root.querySelector("[data-datefield]"); if (!f) return;
+  f.querySelectorAll("[data-dm]").forEach(b=>b.onclick=()=>{ f.dataset.mode=b.dataset.dm;
+    f.querySelectorAll("[data-dm]").forEach(x=>x.classList.toggle("on",x===b));
+    f.querySelector("[data-dexact]").style.display = b.dataset.dm==="exact"?"":"none";
+    f.querySelector("[data-dyear]").style.display = b.dataset.dm==="year"?"":"none";
+    f.querySelector("[data-dunk]").style.display = b.dataset.dm==="unknown"?"":"none"; });
+}
+function readDateField(root){
+  const f = root.querySelector("[data-datefield]");
+  const mode = f.dataset.mode || f.querySelector("[data-dm].on").dataset.dm;
+  if (mode==="year"){ const y = +f.querySelector("[data-dyear]").value; return { dateMode:"year", doneAt: new Date(y, 6, 1, 12).getTime() }; }
+  if (mode==="unknown") return { dateMode:"unknown", doneAt: 0 };
+  return { dateMode:"exact", doneAt: fromISO(f.querySelector("[data-dexact]").value) };
+}
 
 // =============== camada de dados ===============
 // Usa Firebase de verdade, ou um mock (window.__MOCK__) para testes.
@@ -494,7 +528,7 @@ function viewWatch(tab){
   if (S.genre[tab] && !genres.includes(S.genre[tab])) S.genre[tab] = "";
   const gsel = S.genre[tab];
   const list = base.filter(i=>!gsel || (i.genres||[]).includes(gsel)).filter(match)
-    .sort((a,b)=> f==="done" ? doneAt(b)-doneAt(a) : (b.createdAt||0)-(a.createdAt||0));
+    .sort((a,b)=> f==="done" ? sortAt(b)-sortAt(a) : (b.createdAt||0)-(a.createdAt||0));
   let h = segHTML(segs, f, tab);
   if (genres.length) h += `<div class="seg" style="padding-top:2px">${[["","Todos os gêneros"], ...genres.map(g=>[g,g])].map(([k,l])=>`<button class="chip ${gsel===k?"on":""}" data-genre="${esc(k)}" style="font-size:13px;padding:6px 12px">${esc(l)}</button>`).join("")}</div>`;
   h += `<div class="toolbar"><input id="q" placeholder="Buscar…" autocomplete="off">${f!=="done" ? `<button class="btn g" id="rollBtn">🎲 Sortear</button>`:""}<button class="btn g" id="matchBtn" style="position:relative;padding:0 14px">🤝 Topa?${(()=>{ const n=matchPending(tab==="series"?"tv":"movie"); const d=S.match[tab==="series"?"tv":"movie"]; return n && d && d.createdBy!==S.me ? `<i class="mdot">${n}</i>` : ""; })()}</button></div>`;
@@ -527,13 +561,13 @@ function viewPlaces(){
   list.forEach(it=>{ const c=(it.city||"").split(/[-,–]/)[0].trim() || "Sem cidade"; (groups[c]=groups[c]||[]).push(it); });
   const keys = Object.keys(groups).sort((a,b)=> a==="Sem cidade"?1 : b==="Sem cidade"?-1 : groups[b].length-groups[a].length || a.localeCompare(b));
   return h + keys.map(k=>`<div class="city">${esc(k)}<span>${groups[k].length} ${groups[k].length>1?"lugares":"lugar"}</span></div>
-    <div class="list">${groups[k].sort((a,b)=>doneAt(b)-doneAt(a)).map(it=>`
+    <div class="list">${groups[k].sort((a,b)=>sortAt(b)-sortAt(a)).map(it=>`
       <button class="row place" data-open="${esc(it.id)}" style="position:relative">${isNew(it)?`<span class="newtag">NOVO</span>`:""}
         ${coverHTML(it)}
         <div class="body">
           <div class="title">${esc(it.title)}</div>
           <div class="meta">${[it.category, it.city].filter(Boolean).map(esc).join(" · ")}</div>
-          ${f==="done" ? `<div class="meta">${avgRating(it)?`<span style="color:var(--star)">${starStr(avgRating(it))}</span> · `:""}${fmtDate(doneAt(it))}</div>`:""}
+          ${f==="done" ? `<div class="meta">${avgRating(it)?`<span style="color:var(--star)">${starStr(avgRating(it))}</span> · `:""}${shortWhen(it)}</div>`:""}
           ${it.note?`<div class="note">${esc(it.note)}</div>`:""}
         </div></button>`).join("")}</div>`).join("");
 }
@@ -556,8 +590,9 @@ function viewUsAll(){
 
   h += "<!--RETRO-->";
   // retrospectiva
-  const done = S.items.filter(i=>i.status==="done" && new Date(doneAt(i)).getFullYear()===Y);
-  const years = [...new Set(S.items.filter(i=>i.status==="done").map(i=>new Date(doneAt(i)).getFullYear()).concat([new Date().getFullYear()]))].sort((a,b)=>b-a);
+  const done = S.items.filter(i=>i.status==="done" && doneYear(i)===Y);
+  const years = [...new Set(S.items.filter(i=>i.status==="done" && doneYear(i)).map(doneYear).concat([new Date().getFullYear()]))].sort((a,b)=>b-a);
+  const undated = S.items.filter(i=>i.status==="done" && i.dateMode==="unknown").length;
   const films = done.filter(i=>i.kind==="watch"&&i.mediaType==="filme"), series = done.filter(i=>i.kind==="watch"&&i.mediaType==="serie"), places = done.filter(i=>i.kind==="place");
   const hours = Math.round(films.reduce((a,i)=>a+(i.runtime||0),0)/60);
   const top = (arr, key) => { const c={}; arr.forEach(i=>[].concat(i[key]||[]).forEach(v=>{ if(v) c[v]=(c[v]||0)+1; })); return Object.entries(c).sort((a,b)=>b[1]-a[1])[0]; };
@@ -591,7 +626,7 @@ function viewUsAll(){
   h += `<div class="sec" style="display:flex;justify-content:space-between;align-items:center">Metas <button class="chip" id="goalAdd">+ Nova</button></div>`;
   if (!S.goals.length) h += `<div class="small">Ex.: “1 lugar novo por mês” ou “10 filmes no ano”.</div>`;
   S.goals.forEach(g=>{
-    const inPeriod = i => { const d=new Date(doneAt(i)); return d.getFullYear()===now.getFullYear() && (g.period==="ano" || d.getMonth()===now.getMonth()); };
+    const inPeriod = i => { if (i.dateMode==="unknown" || (i.dateMode==="year" && g.period!=="ano")) return false; const d=new Date(doneAt(i)); return d.getFullYear()===now.getFullYear() && (g.period==="ano" || d.getMonth()===now.getMonth()); };
     const n = S.items.filter(i=>i.status==="done" && (g.kind==="place"?i.kind==="place":i.kind==="watch") && inPeriod(i)).length;
     const pct = Math.min(100, Math.round(n/(g.target||1)*100));
     h += `<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(g.text)}</b><button class="small" data-goaldel="${esc(g.id)}">remover</button></div>
@@ -600,18 +635,26 @@ function viewUsAll(){
 
   h += "<!--TL-->";
   // linha do tempo
-  const tl = done.slice().sort((a,b)=>doneAt(b)-doneAt(a));
+  const tl = done.slice().sort((a,b)=>sortAt(b)-sortAt(a));
+  const tlYear = tl.filter(i=>i.dateMode==="year");
   if (tl.length){
     h += `<div class="sec">Linha do tempo de ${Y}</div>`;
     let lastM = -1;
-    tl.forEach(i=>{
+    tl.filter(exactDate).forEach(i=>{
       const d = new Date(doneAt(i));
       if (d.getMonth()!==lastM){ lastM=d.getMonth(); h += `<div class="city" style="font-size:16px;margin:14px 0 4px">${MESES_L[lastM]}</div>`; }
       h += `<button class="tl" data-open="${esc(i.id)}">${coverHTML(i)}<div class="d">${d.getDate()} ${MESES[d.getMonth()]}</div>
         <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${i.kind==="place"?"📍 ":""}${esc(i.title)}</div>${i.occasion?`<div class="small">${esc(i.occasion)}</div>`:""}</div>
         <div style="color:var(--star);font-size:12px">${starStr(avgRating(i))}</div></button>`;
     });
+    if (tlYear.length){
+      h += `<div class="city" style="font-size:16px;margin:14px 0 4px">Em ${Y}, sem data exata</div>`;
+      tlYear.forEach(i=>{ h += `<button class="tl" data-open="${esc(i.id)}">${coverHTML(i)}<div class="d">${Y}</div>
+        <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${i.kind==="place"?"📍 ":""}${esc(i.title)}</div>${i.occasion?`<div class="small">${esc(i.occasion)}</div>`:""}</div>
+        <div style="color:var(--star);font-size:12px">${starStr(avgRating(i))}</div></button>`; });
+    }
   }
+  if (undated) h += `<p class="small" style="margin-top:12px">+ ${undated} ${undated===1?"item":"itens"} sem data (não ${undated===1?"entra":"entram"} na retrospectiva).</p>`;
 
   h += "<!--AJ-->";
   h += `<div class="sec">Ajustes</div><div class="btns">
@@ -719,17 +762,17 @@ function openWatchForm(status, it, mt, defFor){
         ${!editing || isMine(it) ? `<div class="field"><label>Pra quem</label>${chipsInput("ffor", [["other","💌 Pra "+pName()],["both","💑 Nós dois"],["self","🙋 Eu quero ver"]], forVal)}</div>`:""}
         <div class="field"><label>${editing?"Por que assistir?":"Por que você indica?"}</label><textarea id="fNote" placeholder="Conta por que…">${esc(it.note)}</textarea></div>
       ` : editing ? `
-        <div class="field"><label>Quando assistiram</label><input type="date" id="fDate" value="${toISO(doneAt(it))}" max="${today()}"></div>
+        ${dateField("Quando assistiram", it)}
         <div class="field"><label>Ocasião / onde</label><input id="fOcc" placeholder="Ex: no cinema, no nosso aniversário" value="${esc(it.occasion)}"></div>
       ` : `
-        <div class="field"><label>Quando assistiram</label><input type="date" id="fDate" value="${today()}" max="${today()}"></div>
+        ${dateField("Quando assistiram", null)}
         <div class="field"><label>Ocasião / onde</label><input id="fOcc" placeholder="Ex: no cinema, no nosso aniversário"></div>
         <div class="field"><label>Sua nota</label>${starsInput("frate",0)}</div>
         <div class="field"><label>Seu comentário</label><textarea id="fRev" placeholder="O que você achou?"></textarea></div>`}
       <div class="btns"><button class="btn p" id="fSave">${editing?"Salvar":isRec?"Enviar indicação 💌":"Adicionar"}</button><button class="btn g" id="fCancel">Cancelar</button></div>
     </div>`;
   openSheet(html, root=>{
-    wireChips(root); wireStars(root); wireMulti(root);
+    wireChips(root); wireStars(root); wireMulti(root); wireDateField(root);
     root.querySelector('[data-chips="ffor"]')?.setAttribute("data-req","");
     root.querySelector("#fCancel").onclick = ()=> editing ? openDetail(it.id) : closeSheet();
 
@@ -809,7 +852,7 @@ function openWatchForm(status, it, mt, defFor){
         tmdbId: st.tmdb ? st.tmdb.id : null, tmdbType: st.tmdb ? st.tmdb.type : null, platform: chipVal(root,"fplat") };
       data.genres = getMulti(root, "fgen");
       if (isRec){ if (root.querySelector('[data-chips="ffor"]')) data.recFor = chipVal(root,"ffor") || "other"; data.note = val(root,"#fNote"); }
-      if (root.querySelector("#fDate")){ data.doneAt = fromISO(val(root,"#fDate")); data.occasion = val(root,"#fOcc"); }
+      if (root.querySelector("[data-datefield]")){ Object.assign(data, readDateField(root)); data.occasion = val(root,"#fOcc"); }
       e.target.disabled = true;
       try {
         if (editing){ await API.update("items/"+it.id, data); toast("Salvo ✓"); openDetail(it.id); return; }
@@ -869,12 +912,12 @@ function openPlaceForm(status, it){
     <div class="field"><label>Categoria</label>${chipsInput("fcat", PLACE_CATS, it.category)}</div>
     <div class="field"><label>Foto</label><div style="display:flex;gap:12px;align-items:center"><span id="upPrev" style="width:76px">${coverHTML({title:it.title||"Foto",cover:st.cover})}</span>
       <label class="btn g sm upl" style="cursor:pointer">📷 ${st.cover?"Trocar":"Adicionar"} foto<input type="file" accept="image/*" id="upFile"></label></div></div>
-    ${done ? `<div class="field"><label>Quando foram</label><input type="date" id="fDate" value="${toISO(editing?doneAt(it):Date.now())}" max="${today()}"></div>
+    ${done ? `${dateField("Quando foram", editing?it:null)}
       <div class="field"><label>Ocasião</label><input id="fOcc" placeholder="Ex: viagem de férias, 1 ano de namoro" value="${esc(it.occasion)}"></div>`:""}
     <div class="field"><label>${done?"Notas e dicas":"Por que ir? / Dicas"}</label><textarea id="fNote" placeholder="${done?"Ex: pedir o risoto, ir cedo…":"Ex: vi no Instagram, tem vista pro mar…"}">${esc(it.note)}</textarea></div>
     ${done && !editing ? `<div class="field"><label>Sua nota</label>${starsInput("frate",0)}</div><div class="field"><label>Seu comentário</label><textarea id="fRev" placeholder="Como foi?"></textarea></div>`:""}
     <div class="btns"><button class="btn p" id="fSave">${editing?"Salvar":"Adicionar"}</button><button class="btn g" id="fCancel">Cancelar</button></div>`, root=>{
-    wireChips(root); wireStars(root);
+    wireChips(root); wireStars(root); wireDateField(root);
     root.querySelector("#upPrev .cover").style.aspectRatio = "1/1";
     root.querySelector("#fCancel").onclick = ()=> editing ? openDetail(it.id) : closeSheet();
     const f = root.querySelector("#upFile");
@@ -882,7 +925,7 @@ function openPlaceForm(status, it){
     root.querySelector("#fSave").onclick = async e=>{
       const title = val(root,"#fTitle"); if(!title){ toast("Coloca um nome 🙂"); return; }
       const data = { title, city: val(root,"#fCity"), address: val(root,"#fAddr"), category: chipVal(root,"fcat"), note: val(root,"#fNote"), cover: st.cover };
-      if (done){ data.doneAt = fromISO(val(root,"#fDate")); data.occasion = val(root,"#fOcc"); }
+      if (done){ Object.assign(data, readDateField(root)); data.occasion = val(root,"#fOcc"); }
       e.target.disabled = true;
       try {
         if (editing){ await API.update("items/"+it.id, data); toast("Salvo ✓"); openDetail(it.id); return; }
@@ -908,7 +951,7 @@ function openDetail(id){
       <div class="meta">${metaBits.filter(Boolean).map(esc).join(" · ")}</div>
       <div style="margin-top:8px">${progTag(it)}${it.platform?`<span class="tag">📺 ${esc(it.platform)}</span>`:""}</div>
       ${avgRating(it)?`<div style="color:var(--star);margin-top:8px">${starStr(avgRating(it))}</div>`:""}
-      <div class="small" style="margin-top:6px">${done ? `${isPlace?"Fomos":"Assistimos"} em ${fmtDate(doneAt(it))}${it.occasion?` · ${esc(it.occasion)}`:""}` :
+      <div class="small" style="margin-top:6px">${done ? `${whenTxt(it, isPlace?"Fomos":"Assistimos")}${it.occasion?` · ${esc(it.occasion)}`:""}` :
         (!isPlace ? whoText(it) : `Adicionado por ${esc(nameOf(it.createdBy))}`)}</div>
     </div></div>`;
   if (it.note) html += `<div class="sec">${isPlace?"Notas":done?"Por que foi indicado":"Por que assistir"}</div><div class="rev"><p style="margin:0">${esc(it.note)}</p></div>`;
@@ -983,19 +1026,19 @@ function openReview(it, markDone){
   const r = (it.reviews||{})[S.me] || {}, isPlace = it.kind==="place";
   openSheet(`<h2>${markDone ? (isPlace?"Como foi?":"O que você achou?") : "Meu comentário"}</h2>
     <p class="small" style="margin-top:-8px">${esc(it.title)}</p>
-    ${markDone?`<div class="field"><label>Quando</label><input type="date" id="rDate" value="${today()}" max="${today()}"></div>
+    ${markDone?`${dateField("Quando", null)}
       <div class="field"><label>Ocasião / onde</label><input id="rOcc" placeholder="${isPlace?"Ex: viagem de férias":"Ex: no cinema, em casa com pipoca"}"></div>`:""}
     <div class="field"><label>Sua nota</label>${starsInput("rrate", r.rating)}</div>
     <div class="field"><label>Comentário</label><textarea id="rText" placeholder="Escreva o que quiser…">${esc(r.text)}</textarea></div>
     <div class="btns"><button class="btn p" id="rSave">${markDone?(isPlace?"Marcar como visitado":"Marcar como assistido"):"Salvar"}</button>
     <button class="btn g" id="rCancel">Cancelar</button></div>`, root=>{
-    wireStars(root);
+    wireStars(root); wireDateField(root);
     root.querySelector("#rCancel").onclick = ()=>openDetail(it.id);
     root.querySelector("#rSave").onclick = async e=>{
       const rating = +root.querySelector('[data-stars="rrate"]').dataset.val || 0, text = val(root,"#rText");
       const patch = {};
       if (rating || text || r.rating || r.text){ patch[`reviews.${S.me}.rating`] = rating; patch[`reviews.${S.me}.text`] = text; patch[`reviews.${S.me}.at`] = Date.now(); }
-      if (markDone){ patch.doneBy=S.me; patch.doneMarkedAt=Date.now(); patch.status="done"; patch.doneAt=fromISO(val(root,"#rDate")); patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
+      if (markDone){ patch.doneBy=S.me; patch.doneMarkedAt=Date.now(); patch.status="done"; Object.assign(patch, readDateField(root)); patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
       if (!Object.keys(patch).length) return openDetail(it.id);
       e.target.disabled = true;
       try { await API.update("items/"+it.id, patch); toast(markDone ? (isPlace?"Marcado como visitado 📍":"Foi pra Assistidos 🎬") : "Salvo ✓"); markDone ? closeSheet() : openDetail(it.id); }
