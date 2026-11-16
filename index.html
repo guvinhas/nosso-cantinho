@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cantinho">
 <meta name="theme-color" content="#14110f">
-<meta name="app-version" content="8">
+<meta name="app-version" content="9">
 <title>Nosso Cantinho</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314110f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🍿</text></svg>">
 <link rel="apple-touch-icon" id="touchIcon">
@@ -34,6 +34,14 @@ input:focus,textarea:focus{border-color:var(--accent)}
 textarea{resize:vertical;min-height:76px}
 .wrap{max-width:720px;margin:0 auto}
 header{display:flex;align-items:center;gap:12px;padding:12px 0 4px}
+#bell{position:relative;width:42px;height:42px;border-radius:50%;background:var(--card);border:1px solid var(--line);font-size:19px;align-items:center;justify-content:center;flex:none}
+#bell i,.nb{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--accent);color:#170d08;font-size:11px;font-weight:700;font-style:normal;align-items:center;justify-content:center;display:none}
+nav button{position:relative}
+.nb{top:0;right:12px}
+.row.news{padding:10px}
+.row.news .cover{width:52px}
+.row.news.fresh{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.newtag{position:absolute;top:6px;right:6px;font-size:9px;font-weight:800;padding:3px 6px;border-radius:99px;background:var(--accent);color:#170d08;letter-spacing:.4px;z-index:2}
 header .av{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;border:2px solid var(--accent);display:none}
 h1{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:28px;margin:0;letter-spacing:-.5px;line-height:1.05;flex:1}
 h1 small{display:block;font-family:Inter,sans-serif;font-size:12px;font-weight:500;color:var(--mute);letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px}
@@ -219,6 +227,7 @@ nav button.on .i{filter:none;opacity:1}
   <header>
     <img class="av" id="hdrAv" alt="">
     <h1><small id="hello">Nosso cantinho</small><span id="pageTitle">Assistidos</span></h1>
+    <button id="bell" aria-label="Novidades" style="display:none">🔔<i></i></button>
   </header>
   <div class="status" id="status"></div>
   <main id="view"></main>
@@ -255,7 +264,7 @@ const S = {
   filter: { movies:"forme", series:"forme", places:"todo" },
   genre: { movies:"", series:"" },
   q: "", year: new Date().getFullYear(),
-  items: [], people: {}, settings: {}, goals: [], folders: [], usSeg: "us",
+  items: [], people: {}, settings: {}, goals: [], folders: [], usSeg: "us", visited: new Set(), toasted: new Set(),
   me: null, email: "", loaded: false, splashed: false
 };
 const $ = s => document.querySelector(s);
@@ -405,6 +414,7 @@ function applyTheme(){
 function render(){
   if (!S.me) return;
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===S.tab));
+  if (S.newsReady) S.visited.add(S.tab);
   $("#pageTitle").textContent = {movies:"Filmes", series:"Séries", places:"Lugares", us:"Nós dois"}[S.tab];
   const o = other(), st = S.settings;
   $("#hello").textContent = st.title || (o ? `${nameRaw(S.me)} & ${nameRaw(o)}` : `Oi, ${nameRaw(S.me)}`);
@@ -413,10 +423,11 @@ function render(){
   v.innerHTML = S.tab==="movies"||S.tab==="series" ? viewWatch(S.tab) : S.tab==="places" ? viewPlaces() : viewUs();
   const si = $("#q"); if (si){ si.value=S.q; si.oninput=e=>{ S.q=e.target.value; const p=e.target.selectionStart; render(); const n=$("#q"); n.focus(); try{n.setSelectionRange(p,p);}catch(_){} }; }
   $("#fab").style.display = S.tab==="us" ? "none" : "flex";
+  if (S.newsReady) renderBell();
 }
 
 function recRow(it){
-  return `<button class="row" data-open="${esc(it.id)}">
+  return `<button class="row" data-open="${esc(it.id)}" style="position:relative">${isNew(it)?`<span class="newtag">NOVO</span>`:""}
     ${coverHTML(it)}
     <div class="body">
       <div class="title">${esc(it.title)}${it.year?` <span class="meta">${esc(it.year)}</span>`:""}</div>
@@ -458,7 +469,7 @@ function viewWatch(tab){
     return h + emptyHTML(f==="done"?"🍿":"💌", msg);
   }
   if (f==="done") return h + `<div class="stats"><span><b>${done.length}</b> ${word}${done.length!==1?"s":""}</span></div><div class="grid">${list.map(it=>`
-    <button class="poster" data-open="${esc(it.id)}">${coverHTML(it)}<div class="t">${esc(it.title)}</div><div class="s">${starStr(avgRating(it))}</div></button>`).join("")}</div>`;
+    <button class="poster" data-open="${esc(it.id)}">${coverHTML(it, isNew(it)?`<span class="newtag">NOVO</span>`:"")}<div class="t">${esc(it.title)}</div><div class="s">${starStr(avgRating(it))}</div></button>`).join("")}</div>`;
   return h + `<div class="list">${list.map(recRow).join("")}</div>`;
 }
 
@@ -475,7 +486,7 @@ function viewPlaces(){
   const keys = Object.keys(groups).sort((a,b)=> a==="Sem cidade"?1 : b==="Sem cidade"?-1 : groups[b].length-groups[a].length || a.localeCompare(b));
   return h + keys.map(k=>`<div class="city">${esc(k)}<span>${groups[k].length} ${groups[k].length>1?"lugares":"lugar"}</span></div>
     <div class="list">${groups[k].sort((a,b)=>doneAt(b)-doneAt(a)).map(it=>`
-      <button class="row place" data-open="${esc(it.id)}">
+      <button class="row place" data-open="${esc(it.id)}" style="position:relative">${isNew(it)?`<span class="newtag">NOVO</span>`:""}
         ${coverHTML(it)}
         <div class="body">
           <div class="title">${esc(it.title)}</div>
@@ -761,6 +772,7 @@ function openWatchForm(status, it, mt, defFor){
       try {
         if (editing){ await API.update("items/"+it.id, data); toast("Salvo ✓"); openDetail(it.id); return; }
         Object.assign(data, { kind:"watch", status, createdBy:S.me, createdAt:Date.now(), reviews:{} });
+        if (status==="done"){ data.doneBy=S.me; data.doneMarkedAt=Date.now(); }
         const rate = +(root.querySelector('[data-stars="frate"]')?.dataset.val||0), rev = val(root,"#fRev");
         if (!isRec && (rate||rev)) data.reviews[S.me] = { rating:rate, text:rev, at:Date.now() };
         await API.add("items", data);
@@ -833,6 +845,7 @@ function openPlaceForm(status, it){
       try {
         if (editing){ await API.update("items/"+it.id, data); toast("Salvo ✓"); openDetail(it.id); return; }
         Object.assign(data, { kind:"place", status, createdBy:S.me, createdAt:Date.now(), reviews:{} });
+        if (status==="done"){ data.doneBy=S.me; data.doneMarkedAt=Date.now(); }
         const rate = +(root.querySelector('[data-stars="frate"]')?.dataset.val||0), rev = val(root,"#fRev");
         if (done && (rate||rev)) data.reviews[S.me] = { rating:rate, text:rev, at:Date.now() };
         await API.add("items", data); toast("Adicionado ✓"); closeSheet();
@@ -904,7 +917,7 @@ function openDetail(id){
       if (cur===b.dataset.e) delete r.reactions[S.me]; else r.reactions[S.me] = b.dataset.e;
       const v = cur===b.dataset.e ? API.DEL() : b.dataset.e;
       root.querySelectorAll(`[data-react="${b.dataset.react}"]`).forEach(x=>x.classList.toggle("on", x===b && cur!==b.dataset.e));
-      try { await API.update("items/"+it.id, { [`reviews.${b.dataset.react}.reactions.${S.me}`]: v }); } catch(err){ writeErr(err); }
+      try { await API.update("items/"+it.id, { [`reviews.${b.dataset.react}.reactions.${S.me}`]: v, [`reviews.${b.dataset.react}.reactAt.${S.me}`]: Date.now() }); } catch(err){ writeErr(err); }
     });
     // progresso da série
     let p = { ...(it.progress||{ s:0, e:0 }) }, pt;
@@ -940,7 +953,7 @@ function openReview(it, markDone){
       const rating = +root.querySelector('[data-stars="rrate"]').dataset.val || 0, text = val(root,"#rText");
       const patch = {};
       if (rating || text || r.rating || r.text){ patch[`reviews.${S.me}.rating`] = rating; patch[`reviews.${S.me}.text`] = text; patch[`reviews.${S.me}.at`] = Date.now(); }
-      if (markDone){ patch.status="done"; patch.doneAt=fromISO(val(root,"#rDate")); patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
+      if (markDone){ patch.doneBy=S.me; patch.doneMarkedAt=Date.now(); patch.status="done"; patch.doneAt=fromISO(val(root,"#rDate")); patch.occasion=val(root,"#rOcc"); patch.progress=API.DEL(); }
       if (!Object.keys(patch).length) return openDetail(it.id);
       e.target.disabled = true;
       try { await API.update("items/"+it.id, patch); toast(markDone ? (isPlace?"Marcado como visitado 📍":"Foi pra Assistidos 🎬") : "Salvo ✓"); markDone ? closeSheet() : openDetail(it.id); }
@@ -1317,6 +1330,100 @@ function openSaveToFolder(it){
   draw();
 }
 
+// =============== novidades ===============
+const tabOf = it => it.kind==="place" ? "places" : it.mediaType==="serie" ? "series" : "movies";
+const isNew = it => S.prevSeen && it.createdBy && it.createdBy!==S.me && (it.createdAt||0) > S.prevSeen;
+function agoTxt(ms){ const m=Math.round((Date.now()-ms)/60000); if(m<1) return "agora"; if(m<60) return `${m} min`; const h=Math.round(m/60); if(h<24) return `${h} h`; const d=Math.round(h/24); return d===1?"ontem":`${d} dias`; }
+function buildEvents(since){
+  const o = other(); if (!o) return [];
+  const on = esc(nameRaw(o)), ev = [];
+  for (const it of S.items){
+    const t = `<b>${esc(it.title)}</b>`, place = it.kind==="place", w = it.mediaType==="serie" ? "a série" : "o filme";
+    if (it.createdBy===o && (it.createdAt||0) > since){
+      let txt, icon;
+      if (place){ icon="📍"; txt = it.status==="done" ? `${on} registrou que vocês foram em ${t}` : `${on} quer ir em ${t}`; }
+      else if (it.status==="done"){ icon="🎬"; txt = `${on} registrou ${w} ${t} como assistid${it.mediaType==="serie"?"a":"o"}`; }
+      else if (forMeFn(it)){ icon="💌"; txt = `${on} te indicou ${w} ${t}`; }
+      else if (togetherFn(it)){ icon="💑"; txt = `${on} adicionou ${t} pra vocês verem juntos`; }
+      else { icon="🙋"; txt = `${on} quer ver ${t}`; }
+      ev.push({ key:"c"+it.id, at:it.createdAt, it, icon, txt, tab:tabOf(it) });
+    }
+    const r = it.reviews && it.reviews[o];
+    const marked = it.doneBy===o && (it.doneMarkedAt||0) > since && !(it.createdBy===o && (it.createdAt||0) > since);
+    if (r && (r.at||0) > since && (r.text||r.rating)){
+      const stars = r.rating ? ` <span style="color:var(--star)">${starStr(r.rating)}</span>` : "";
+      ev.push({ key:"r"+it.id+(r.at||0), at:r.at, it, icon:place?"📍":"⭐", tab:tabOf(it),
+        txt: `${on} ${marked ? (place?"foi em":"assistiu") + " " + t + " e avaliou" : "avaliou " + t}${stars}`, quote: r.text });
+    } else if (marked){
+      ev.push({ key:"d"+it.id, at:it.doneMarkedAt, it, icon:place?"📍":"✅", tab:tabOf(it), txt: `${on} marcou ${t} como ${place?"visitado":"assistido"}` });
+    }
+    const mine = it.reviews && it.reviews[S.me];
+    const ra = mine && mine.reactAt && mine.reactAt[o], re = mine && mine.reactions && mine.reactions[o];
+    if (ra > since && re) ev.push({ key:"x"+it.id+ra, at:ra, it, icon:re, tab:tabOf(it), txt: `${on} reagiu ${re} ao seu comentário em ${t}` });
+  }
+  for (const f of S.folders) if (f.createdBy===o && (f.createdAt||0) > since)
+    ev.push({ key:"f"+f.id, at:f.createdAt, folder:f.id, icon:f.emoji||"📁", tab:"us", txt: `${on} criou a pasta <b>${esc(f.name)}</b>` });
+  for (const g of S.goals) if (g.createdBy===o && (g.createdAt||0) > since)
+    ev.push({ key:"g"+g.id, at:g.createdAt, icon:"🎯", tab:"us", txt: `${on} criou a meta <b>${esc(g.text)}</b>` });
+  return ev.sort((a,b)=>b.at-a.at);
+}
+function markSeen(){
+  S.ackAt = Date.now();
+  API.set("people/"+S.me, { lastSeen: S.ackAt }).catch(()=>{});
+  renderBell();
+}
+function renderBell(){
+  const n = S.me && S.ackAt ? buildEvents(S.ackAt).length : 0;
+  const b = $("#bell"); if (!b) return;
+  b.style.display = S.me ? "flex" : "none";
+  b.querySelector("i").textContent = n > 9 ? "9+" : n; b.querySelector("i").style.display = n ? "flex" : "none";
+  // bolinhas nas abas
+  const per = {}; if (S.prevSeen) buildEvents(S.prevSeen).forEach(e=>{ if (!S.visited.has(e.tab)) per[e.tab]=(per[e.tab]||0)+1; });
+  document.querySelectorAll("nav button").forEach(nb=>{ let d = nb.querySelector(".nb"); const c = nb.dataset.tab!==S.tab ? per[nb.dataset.tab] : 0;
+    if (!d){ d=document.createElement("span"); d.className="nb"; nb.appendChild(d); } d.textContent = c>9?"9+":c||""; d.style.display = c ? "flex" : "none"; });
+}
+function openNews(auto){
+  const since = S.prevSeen || Date.now();
+  const fresh = new Set(buildEvents(S.ackAt || since).map(e=>e.key));
+  const list = buildEvents(Math.min(since, Date.now() - 14*86400000)).slice(0, 40);
+  const o = other();
+  openSheet(`<h2>✨ Novidades</h2>
+    ${!o ? `<div class="small">Quando ${esc(pName())} entrar no app, o que ele(a) fizer aparece aqui.</div>` :
+      !list.length ? emptyHTML("🍃", `Nada novo de ${esc(nameRaw(o))} nos últimos dias.`) :
+      `<div class="list" style="margin-top:0">${list.map(e=>`<button class="row news ${fresh.has(e.key)?"fresh":""}" ${e.it?`data-nopen="${esc(e.it.id)}"`:e.folder?`data-nfolder="${esc(e.folder)}"`:""}>
+        ${e.it ? coverHTML(e.it) : `<div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:30px;aspect-ratio:1/1">${e.icon}</div>`}
+        <div class="body"><div style="font-size:14px;line-height:1.35">${e.it?e.icon+" ":""}${e.txt}</div>
+          ${e.quote?`<div class="note">“${esc(e.quote)}”</div>`:""}
+          <div class="meta">${agoTxt(e.at)}${fresh.has(e.key)?` · <span style="color:var(--accent);font-weight:600">novo</span>`:""}</div></div></button>`).join("")}</div>`}
+    <div class="btns" style="margin-top:14px"><button class="btn p" id="nOk">${auto?"Oba, vi tudo 💛":"Fechar"}</button></div>`, root=>{
+    root.querySelector("#nOk").onclick = ()=>{ markSeen(); closeSheet(); };
+    root.querySelector(".sheet-x") && root.querySelector(".sheet-x").addEventListener("click", markSeen);
+    root.querySelectorAll("[data-nopen]").forEach(b=>b.onclick=()=>{ markSeen(); openDetail(b.dataset.nopen); });
+    root.querySelectorAll("[data-nfolder]").forEach(b=>b.onclick=()=>{ markSeen(); openFolder(b.dataset.nfolder); });
+  });
+}
+function newsTick(){
+  if (!S.newsReady) return;
+  const evs = buildEvents(S.ackAt || Date.now());
+  for (const e of evs) if (!S.toasted.has(e.key)){ S.toasted.add(e.key);
+    if (S.liveToasts) toast(e.txt.replace(/<[^>]+>/g,"").slice(0,60)); }
+  renderBell();
+}
+function startNews(){
+  if (S.newsReady) return;
+  const me = S.people[S.me] || {};
+  S.newsReady = true;
+  S.prevSeen = me.lastSeen || Date.now();
+  S.ackAt = S.prevSeen;
+  const evs = buildEvents(S.prevSeen);
+  evs.forEach(e=>S.toasted.add(e.key));
+  setTimeout(()=>{ S.liveToasts = true; }, 1500);
+  renderBell(); render();
+  if (!me.lastSeen) API.set("people/"+S.me, { lastSeen: Date.now() }).catch(()=>{});
+  else if (evs.length && !$("#sheetBg").classList.contains("show")) setTimeout(()=>openNews(true), S.settings.photo ? 2000 : 300);
+  else if (!evs.length) API.set("people/"+S.me, { lastSeen: Date.now() }).catch(()=>{});
+}
+
 // ---------- ajustes ----------
 function openName(force){
   S.mustName = force;
@@ -1368,7 +1475,7 @@ function openGoal(){
       const kind = chipVal(root,"gkind"), period = chipVal(root,"gper"), target = Math.max(1, +val(root,"#gTarget")||1);
       const text = val(root,"#gText") || `${target} ${kind==="place"?(target>1?"lugares":"lugar"):(target>1?"filmes/séries":"filme/série")} por ${period==="mes"?"mês":"ano"}`;
       e.target.disabled = true;
-      try { await API.add("goals", { text, kind, period, target, createdAt: Date.now() }); closeSheet(); toast("Meta criada 🎯"); }
+      try { await API.add("goals", { text, kind, period, target, createdBy:S.me, createdAt: Date.now() }); closeSheet(); toast("Meta criada 🎯"); }
       catch(err){ e.target.disabled=false; writeErr(err); }
     };
   });
@@ -1404,6 +1511,7 @@ $("#view").addEventListener("click", e=>{
   else if (id==="editMe") openName(false);
   else if (id==="logout") API.signOut();
 });
+$("#bell").onclick = ()=>openNews(false);
 $("#fab").onclick = ()=>{
   if (S.tab==="movies"||S.tab==="series"){
     const mt = S.tab==="series" ? "serie" : "filme", f = S.filter[S.tab];
@@ -1483,7 +1591,7 @@ function showSplash(){
   try { await initAPI(); } catch(e){ document.body.innerHTML = `<p style="padding:40px;text-align:center">Não consegui carregar. Verifique sua internet.</p>`; return; }
   API.onAuth(async u=>{
     unsubs.forEach(f=>{ try{f();}catch(_){} }); unsubs=[];
-    if (!u){ S.me=null; $("#auth").style.display="block"; $("#app").style.display="none"; $("#nav").style.display="none"; $("#fab").style.display="none"; closeSheet(); return; }
+    if (!u){ S.me=null; S.newsReady=false; S.prevSeen=null; S.ackAt=null; S.toasted=new Set(); S.visited=new Set(); $("#bell").style.display="none"; $("#auth").style.display="block"; $("#app").style.display="none"; $("#nav").style.display="none"; $("#fab").style.display="none"; closeSheet(); return; }
     S.me = u.uid; S.email = u.email || "";
     $("#auth").style.display="none"; $("#app").style.display="block"; $("#nav").style.display="flex";
     if (S.pendingName){ API.set("people/"+S.me, { name:S.pendingName, email:S.email }).catch(()=>{}); S.people[S.me]={name:S.pendingName}; S.pendingName=null; }
@@ -1499,6 +1607,7 @@ function showSplash(){
       S.people = {}; docs.forEach(d=>S.people[d.id]=d); gotPeople = true;
       if (!S.people[S.me] && !$("#sheetBg").classList.contains("show")) openName(true);
       render();
+      if (!S.newsReady && S.loaded && S.people[S.me]) setTimeout(startNews, 700); else newsTick();
     }, onErr));
     unsubs.push(API.watch("settings", docs=>{
       S.settings = docs.find(d=>d.id==="couple") || {}; applyTheme();
@@ -1506,11 +1615,12 @@ function showSplash(){
       if (!S.splashed) showSplash();
       render();
     }, onErr));
-    unsubs.push(API.watch("folders", docs=>{ S.folders = docs; render(); }, onErr));
+    unsubs.push(API.watch("folders", docs=>{ S.folders = docs; render(); newsTick(); }, onErr));
     unsubs.push(API.watch("goals", docs=>{ S.goals = docs.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); render(); }, onErr));
     unsubs.push(API.watch("items", docs=>{
       S.items = docs; S.loaded = true; clearTimeout(timer); setStatus("");
       render();
+      if (!S.newsReady && gotPeople) setTimeout(startNews, 700); else newsTick();
     }, onErr));
   });
 })();
